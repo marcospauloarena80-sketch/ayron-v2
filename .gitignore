@@ -64,3 +64,4 @@ minio_data/
 # Misc
 -p/
 mkdir/
+.worktrees/
