@@ -1,0 +1,702 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// AYRON — ERD v1.0 (dbdiagram.io)
+// Cole em https://dbdiagram.io/d para visualizar
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════
+// CAMADA 1 — IDENTIDADE E ACESSO
+// ══════════════════════════════════════════════
+
+Table organizations {
+  id         uuid [pk]
+  name       text [not null]
+  document   text
+  plan_tier  text [default: 'CORE']
+  is_active  bool [default: true]
+  settings   json
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table clinics {
+  id              uuid [pk]
+  organization_id uuid [ref: > organizations.id]
+  name            text [not null]
+  document        text
+  timezone        text [default: 'America/Sao_Paulo']
+  specialty       text
+  settings        json
+  is_active       bool [default: true]
+  created_at      timestamp
+  updated_at      timestamp
+  deleted_at      timestamp
+}
+
+Table users {
+  id              uuid [pk]
+  organization_id uuid [ref: > organizations.id]
+  clinic_id       uuid [ref: > clinics.id]
+  name            text [not null]
+  email           text [not null]
+  password_hash   text [not null]
+  role            text [note: 'MASTER|GERENTE|MEDICO|ENFERMEIRA|TECNICA|CONCIERGE|ADMINISTRATIVO|FINANCEIRO']
+  permissions     json
+  is_active       bool [default: true]
+  last_login_at   timestamp
+  created_at      timestamp
+  updated_at      timestamp
+  deleted_at      timestamp
+
+  indexes {
+    (email, clinic_id) [unique]
+  }
+}
+
+Table sessions {
+  id         uuid [pk]
+  user_id    uuid [ref: > users.id]
+  clinic_id  uuid
+  token_hash text [unique]
+  ip_address text
+  user_agent text
+  expires_at timestamp [not null]
+  created_at timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 1b — PROFISSIONAIS
+// ══════════════════════════════════════════════
+
+Table professionals {
+  id         uuid [pk]
+  clinic_id  uuid [ref: > clinics.id]
+  user_id    uuid [ref: > users.id, note: 'nullable — médico externo sem login']
+  name       text [not null]
+  specialty  text
+  crm        text
+  crm_state  text
+  is_active  bool [default: true]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table professional_schedules {
+  id              uuid [pk]
+  professional_id uuid [ref: > professionals.id]
+  clinic_id       uuid
+  day_of_week     int [note: '0=Dom … 6=Sáb']
+  start_time      text [note: '"08:00"']
+  end_time        text [note: '"18:00"']
+  slot_duration   int [default: 30]
+  is_active       bool [default: true]
+  created_at      timestamp
+  updated_at      timestamp
+
+  indexes {
+    (professional_id, day_of_week) [unique]
+  }
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 2 — PACIENTES
+// ══════════════════════════════════════════════
+
+Table patients {
+  id               uuid [pk]
+  clinic_id        uuid [ref: > clinics.id]
+  full_name        text [not null]
+  birth_date       date [not null]
+  sex              text
+  cpf              text [note: 'unique via partial index SQL (WHERE deleted_at IS NULL)']
+  phone            text
+  email            text
+  address          json
+  insurance        json
+  risk_score       float [default: 0]
+  risk_level       text [note: 'PREVENTIVO|ATENCAO|PRIORITARIO|CRITICO']
+  current_status   text [note: 'NOVA_LEAD|AGENDADO|CONSULTA|...']
+  cognitive_vector vector(1536) [note: 'pgvector — memória semântica']
+  notes            text
+  is_active        bool [default: true]
+  created_at       timestamp
+  updated_at       timestamp
+  deleted_at       timestamp
+}
+
+Table patient_status_history {
+  id          uuid [pk]
+  patient_id  uuid [ref: > patients.id]
+  clinic_id   uuid
+  from_status text
+  to_status   text [not null]
+  changed_by  uuid [note: 'user_id']
+  reason      text
+  created_at  timestamp
+}
+
+Table patient_consent_records {
+  id           uuid [pk]
+  clinic_id    uuid [ref: > clinics.id]
+  patient_id   uuid [ref: > patients.id]
+  consent_type text [note: 'TREATMENT_DATA|MARKETING|AI_PROCESSING|WEARABLE_INTEGRATION|...']
+  status       text [note: 'GRANTED|REVOKED|EXPIRED']
+  granted_at   timestamp
+  expires_at   timestamp
+  revoked_at   timestamp
+  ip_address   text
+  channel      text [default: 'WEB']
+  document_url text
+
+  indexes {
+    (patient_id, consent_type, clinic_id) [unique]
+  }
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 3 — AGENDA
+// ══════════════════════════════════════════════
+
+Table services {
+  id           uuid [pk]
+  clinic_id    uuid [ref: > clinics.id]
+  name         text [not null]
+  description  text
+  duration_min int [default: 30]
+  price        decimal(12,2)
+  color        text
+  is_active    bool [default: true]
+  created_at   timestamp
+  updated_at   timestamp
+}
+
+Table appointments {
+  id                  uuid [pk]
+  clinic_id           uuid [ref: > clinics.id]
+  patient_id          uuid [ref: > patients.id]
+  professional_id     uuid [ref: > professionals.id, note: 'referencia professionals — NÃO users']
+  service_id          uuid [ref: > services.id]
+  type                text [note: 'CONSULTATION|PROCEDURE|RETURN|EVALUATION|TELECONSULTATION|EXAM_REVIEW']
+  status              text [note: 'SCHEDULED|CONFIRMED|CHECKED_IN|IN_PROGRESS|COMPLETED|CANCELLED|MISSED']
+  start_time          timestamp [not null]
+  end_time            timestamp [not null]
+  checked_in_at       timestamp
+  checked_out_at      timestamp
+  notes               text
+  cancellation_reason text
+  is_telemedicine     bool [default: false]
+  created_at          timestamp
+  updated_at          timestamp
+  deleted_at          timestamp
+}
+
+Table waitlist_entries {
+  id              uuid [pk]
+  clinic_id       uuid [ref: > clinics.id]
+  patient_id      uuid
+  service_id      uuid
+  professional_id uuid
+  priority        int [default: 0]
+  notes           text
+  created_at      timestamp
+  resolved_at     timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 4 — PRONTUÁRIO E EXAMES
+// ══════════════════════════════════════════════
+
+Table clinical_records {
+  id              uuid [pk]
+  clinic_id       uuid [ref: > clinics.id]
+  patient_id      uuid [ref: > patients.id]
+  appointment_id  uuid [ref: > appointments.id]
+  professional_id uuid [ref: > professionals.id]
+  transcription   text
+  structured_data json
+  summary_ai      text
+  voice_file_url  text
+  created_at      timestamp
+  updated_at      timestamp
+  deleted_at      timestamp
+}
+
+Table exams {
+  id                uuid [pk]
+  clinic_id         uuid [ref: > clinics.id]
+  patient_id        uuid [ref: > patients.id]
+  exam_date         date [not null]
+  laboratory        text
+  file_url          text
+  ocr_raw           text
+  processing_status text [default: 'PENDING']
+  created_at        timestamp
+  updated_at        timestamp
+  deleted_at        timestamp
+}
+
+Table exam_markers {
+  id                uuid [pk]
+  exam_id           uuid [ref: > exams.id]
+  patient_id        uuid
+  marker_name       text [not null]
+  standardized_name text
+  value             float [not null]
+  unit              text
+  ideal_min         float
+  ideal_max         float
+  functional_min    float
+  functional_max    float
+  status            text [note: 'LOW|IDEAL|HIGH|CRITICAL_LOW|CRITICAL_HIGH']
+  trend             text [note: 'IMPROVING|STABLE|WORSENING']
+  created_at        timestamp
+}
+
+Table biomarker_references {
+  id                uuid [pk]
+  clinic_id         uuid
+  standardized_name text [not null]
+  unit              text
+  ideal_min         float
+  ideal_max         float
+  functional_min    float
+  functional_max    float
+  notes             text
+  created_at        timestamp
+  updated_at        timestamp
+
+  indexes {
+    (clinic_id, standardized_name) [unique]
+  }
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 5 — DOCUMENTOS MÉDICOS
+// ══════════════════════════════════════════════
+
+Table document_templates {
+  id         uuid [pk]
+  clinic_id  uuid
+  name       text
+  type       text [note: 'PRESCRIPTION|CERTIFICATE|EXAM_REQUEST|REFERRAL|REPORT|CUSTOM']
+  content    text
+  is_active  bool [default: true]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table documents {
+  id          uuid [pk]
+  clinic_id   uuid [ref: > clinics.id]
+  patient_id  uuid [ref: > patients.id]
+  created_by  uuid [ref: > users.id]
+  template_id uuid [ref: > document_templates.id]
+  type        text
+  status      text [note: 'DRAFT|SIGNED|REVOKED']
+  content     text [not null]
+  file_url    text
+  signed_at   timestamp [note: 'imutável após set']
+  created_at  timestamp
+  updated_at  timestamp
+  deleted_at  timestamp
+}
+
+Table document_signatures {
+  id          uuid [pk]
+  document_id uuid [ref: > documents.id]
+  signed_by   uuid [ref: > users.id]
+  signature   text [not null]
+  signed_at   timestamp
+  ip_address  text
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 6 — FINANCEIRO
+// ══════════════════════════════════════════════
+
+Table transactions {
+  id              uuid [pk]
+  clinic_id       uuid [ref: > clinics.id]
+  patient_id      uuid [ref: > patients.id]
+  appointment_id  uuid [ref: > appointments.id]
+  type            text [note: 'REVENUE|EXPENSE|REFUND|TRANSFER']
+  status          text [note: 'PENDING|COMPLETED|CANCELLED|OVERDUE']
+  amount          decimal(12,2) [not null]
+  payment_method  text
+  description     text
+  reference_code  text
+  due_date        timestamp
+  paid_at         timestamp
+  category        text
+  insurance_claim json
+  created_by      uuid
+  created_at      timestamp
+  updated_at      timestamp
+  deleted_at      timestamp
+}
+
+Table daily_closings {
+  id                     uuid [pk]
+  clinic_id              uuid [ref: > clinics.id]
+  closing_date           date [not null]
+  total_revenue          decimal(12,2) [not null]
+  total_expenses         decimal(12,2) [not null]
+  net_result             decimal(12,2) [not null]
+  appointments_total     int
+  appointments_completed int
+  closing_summary        json
+  closed_by              uuid [note: 'user_id']
+  closed_at              timestamp
+  has_pendencies         bool [default: false]
+
+  indexes {
+    (clinic_id, closing_date) [unique]
+  }
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 7 — ESTOQUE
+// ══════════════════════════════════════════════
+
+Table inventory_items {
+  id            uuid [pk]
+  clinic_id     uuid [ref: > clinics.id]
+  name          text [not null]
+  category      text
+  unit          text [default: 'UN']
+  quantity      int [default: 0]
+  minimum_level int [default: 0]
+  unit_cost     decimal(12,2)
+  barcode       text
+  expiry_date   timestamp
+  batch_number  text
+  supplier_id   uuid
+  is_active     bool [default: true]
+  created_at    timestamp
+  updated_at    timestamp
+  deleted_at    timestamp
+}
+
+Table inventory_movements {
+  id           uuid [pk]
+  item_id      uuid [ref: > inventory_items.id]
+  clinic_id    uuid
+  type         text [note: 'ENTRY|EXIT|ADJUSTMENT|LOSS|TRANSFER']
+  quantity     int [not null]
+  unit_cost    decimal(12,2)
+  ocr_data     json
+  notes        text
+  performed_by uuid [note: 'user_id']
+  created_at   timestamp
+}
+
+Table suppliers {
+  id         uuid [pk]
+  clinic_id  uuid
+  name       text [not null]
+  document   text
+  email      text
+  phone      text
+  is_active  bool [default: true]
+  created_at timestamp
+  updated_at timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 8 — COMUNICAÇÃO INTERNA
+// ══════════════════════════════════════════════
+
+Table communication_channels {
+  id         uuid [pk]
+  clinic_id  uuid [ref: > clinics.id]
+  name       text
+  type       text [note: 'GENERAL|DOCTORS|RECEPTION|NURSING|EMERGENCY']
+  is_active  bool [default: true]
+  created_at timestamp
+}
+
+Table communication_messages {
+  id         uuid [pk]
+  channel_id uuid [ref: > communication_channels.id]
+  clinic_id  uuid
+  sender_id  uuid [ref: > users.id]
+  content    text [not null]
+  priority   text [note: 'NORMAL|URGENT|EMERGENCY']
+  is_read    bool [default: false]
+  read_at    timestamp
+  created_at timestamp
+  deleted_at timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 9 — FORMULÁRIOS
+// ══════════════════════════════════════════════
+
+Table form_templates {
+  id          uuid [pk]
+  clinic_id   uuid
+  title       text [not null]
+  description text
+  is_active   bool [default: true]
+  created_at  timestamp
+  updated_at  timestamp
+  deleted_at  timestamp
+}
+
+Table form_fields {
+  id          uuid [pk]
+  template_id uuid [ref: > form_templates.id]
+  label       text [not null]
+  type        text [note: 'TEXT|NUMBER|SELECT|MULTISELECT|DATE|BOOLEAN']
+  options     json
+  is_required bool [default: false]
+  order       int [default: 0]
+}
+
+Table form_responses {
+  id          uuid [pk]
+  template_id uuid [ref: > form_templates.id]
+  patient_id  uuid [ref: > patients.id]
+  clinic_id   uuid
+  answers     json [not null]
+  completed   bool [default: false]
+  created_at  timestamp
+  updated_at  timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 10 — EVENT STORE
+// (particionada mensalmente via SQL — 005_events_partition.sql)
+// ══════════════════════════════════════════════
+
+Table events {
+  id            uuid [pk]
+  clinic_id     uuid [ref: > clinics.id]
+  event_type    text [not null]
+  event_version text [default: '1.0']
+  entity_type   text
+  entity_id     uuid
+  actor_id      uuid [note: 'user_id — null = sistema/IA']
+  payload       json
+  processed     bool [default: false]
+  processed_at  timestamp
+  created_at    timestamp [note: 'chave de particionamento']
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 11 — DECISION PROPOSAL ⭐ (núcleo cognitivo)
+// ══════════════════════════════════════════════
+
+Table decision_proposals {
+  id                 uuid [pk]
+  clinic_id          uuid [ref: > clinics.id]
+  proposal_type      text [note: 'CLINICAL|OPERATIONAL|FINANCIAL|RELATIONAL|STRATEGIC|INVENTORY']
+  priority           text [note: 'P0_CRITICAL|P1_HIGH|P2_OPTIMIZATION|P3_INFORMATIONAL']
+  risk_level         text [note: 'LOW|MODERATE|HIGH|CRITICAL']
+  status             text [note: 'PENDING_APPROVAL|APPROVED|REJECTED|EXECUTING|EXECUTED|EXPIRED']
+  context            text [not null]
+  analysis           text [not null]
+  ai_reasoning       text [not null]
+  proposed_action    json [not null]
+  expected_impact    json [not null]
+  confidence         float [not null]
+  data_sources       json
+  data_snapshot_hash text
+  ai_model_version   text
+  required_role      text [note: 'UserRole mínimo para aprovar']
+  expires_at         timestamp
+  created_by_agent   text [note: '"ClinicalAgent"|"FinanceAgent"|...']
+  approved_by        uuid [ref: > users.id]
+  rejection_reason   text
+  approved_at        timestamp
+  executed_at        timestamp
+  execution_result   json
+  created_at         timestamp
+  updated_at         timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 12 — AUDITORIA IMUTÁVEL
+// (imutabilidade via trigger — 003_audit_immutability.sql)
+// ══════════════════════════════════════════════
+
+Table audit_logs {
+  id                 uuid [pk]
+  clinic_id          uuid
+  organization_id    uuid
+  actor_id           uuid [ref: > users.id]
+  actor_role         text
+  action             text [note: 'CREATE|UPDATE|DELETE_SOFT|LOGIN|LOGOUT|APPROVE|REJECT|SIGN|AI_GENERATE|...']
+  entity_type        text
+  entity_id          uuid
+  proposal_id        uuid
+  metadata           json
+  data_before        json
+  data_after         json
+  data_snapshot_hash text
+  ip_address         text
+  session_id         uuid
+  ai_model_version   text
+  created_at         timestamp [note: 'append-only — trigger bloqueia UPDATE/DELETE']
+}
+
+Table ai_action_logs {
+  id            uuid [pk]
+  clinic_id     uuid [ref: > clinics.id]
+  agent_name    text [not null]
+  model_version text
+  input_summary text
+  output_type   text
+  output_id     uuid
+  confidence    float
+  latency_ms    int
+  tokens_used   int
+  cost_usd      float
+  success       bool [default: true]
+  error_message text
+  created_at    timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 13 — MEMÓRIA COGNITIVA (V6)
+// ══════════════════════════════════════════════
+
+Table cognitive_memory {
+  id              uuid [pk]
+  clinic_id       uuid [ref: > clinics.id]
+  patient_id      uuid [ref: > patients.id]
+  memory_type     text [note: 'CLINICAL_PATTERN|BEHAVIORAL_PATTERN|OPERATIONAL_PATTERN|FINANCIAL_PATTERN|PREFERENCE']
+  memory_text     text [not null]
+  embedding       vector(1536) [note: 'pgvector HNSW — busca semântica']
+  relevance_score float [default: 0.5]
+  source_events   json
+  is_active       bool [default: true]
+  created_at      timestamp
+  updated_at      timestamp
+  expires_at      timestamp
+}
+
+Table behavior_patterns {
+  id             uuid [pk]
+  clinic_id      uuid [ref: > clinics.id]
+  user_id        uuid
+  pattern_type   text [not null]
+  description    text
+  confidence     float [default: 0.5]
+  sample_count   int [default: 1]
+  pattern_data   json
+  detected_at    timestamp
+  last_confirmed timestamp
+  is_active      bool [default: true]
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 14 — DIGITAL TWIN E ANALYTICS (V8)
+// ══════════════════════════════════════════════
+
+Table digital_twin_snapshots {
+  id                     uuid [pk]
+  clinic_id              uuid [ref: > clinics.id]
+  snapshot_type          text [note: 'DAILY_STATE|SIMULATION|SCENARIO']
+  simulation_data        json [not null]
+  prediction_window_days int [default: 30]
+  confidence             float [default: 0.5]
+  scenario_description   text
+  created_at             timestamp
+}
+
+Table clinic_metrics_daily {
+  id                     uuid [pk]
+  clinic_id              uuid [ref: > clinics.id]
+  metric_date            date [not null]
+  appointments_scheduled int [default: 0]
+  appointments_completed int [default: 0]
+  appointments_missed    int [default: 0]
+  appointments_cancelled int [default: 0]
+  new_patients           int [default: 0]
+  returning_patients     int [default: 0]
+  revenue_total          decimal(12,2) [default: 0]
+  avg_consultation_min   float
+  occupation_rate        float
+  clinic_health_score    float
+  score_breakdown        json
+  created_at             timestamp
+
+  indexes {
+    (clinic_id, metric_date) [unique]
+  }
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 15 — FEATURE FLAGS E NOTIFICAÇÕES
+// ══════════════════════════════════════════════
+
+Table feature_flags {
+  id         uuid [pk]
+  clinic_id  uuid [ref: > clinics.id]
+  flag       text [note: 'COGNITIVE_LEARNING|DIGITAL_TWIN|TELEMEDICINE|WEARABLES_INTEGRATION|...']
+  enabled    bool [default: false]
+  config     json
+  enabled_at timestamp
+  updated_by uuid
+  updated_at timestamp
+
+  indexes {
+    (clinic_id, flag) [unique]
+  }
+}
+
+Table notification_logs {
+  id         uuid [pk]
+  clinic_id  uuid [ref: > clinics.id]
+  patient_id uuid [ref: > patients.id]
+  user_id    uuid [ref: > users.id]
+  channel    text [note: 'WEBSOCKET|PUSH|EMAIL|WHATSAPP']
+  event_type text
+  content    json
+  sent       bool [default: false]
+  sent_at    timestamp
+  error      text
+  created_at timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 16 — WEARABLES (V19)
+// ══════════════════════════════════════════════
+
+Table wearable_data_points {
+  id             uuid [pk]
+  patient_id     uuid [ref: > patients.id]
+  clinic_id      uuid [ref: > clinics.id]
+  source         text [note: 'APPLE_HEALTH|GOOGLE_FIT|OURA|DEXCOM']
+  metric_type    text [note: 'HRV|HEART_RATE|SLEEP_SCORE|GLUCOSE']
+  value          float [not null]
+  unit           text
+  recorded_at    timestamp [not null]
+  is_anomaly     bool [default: false]
+  clinical_notes text
+  created_at     timestamp
+}
+
+// ══════════════════════════════════════════════
+// CAMADA 17 — CONSENTIMENTO LGPD
+// ══════════════════════════════════════════════
+
+Table patient_consent_records {
+  id           uuid [pk]
+  clinic_id    uuid [ref: > clinics.id]
+  patient_id   uuid [ref: > patients.id]
+  consent_type text [note: 'TREATMENT_DATA|MARKETING|RESEARCH_ANONYMOUS|AI_PROCESSING|WEARABLE_INTEGRATION|TELEMEDICINE']
+  status       text [note: 'GRANTED|REVOKED|EXPIRED']
+  granted_at   timestamp
+  expires_at   timestamp
+  revoked_at   timestamp
+  ip_address   text
+  channel      text [default: 'WEB']
+  document_url text
+
+  indexes {
+    (patient_id, consent_type, clinic_id) [unique]
+  }
+}

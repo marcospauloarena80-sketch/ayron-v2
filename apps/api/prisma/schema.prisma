@@ -1,0 +1,2130 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// AYRON — Schema Master v1.0  (AUDITADO E CORRIGIDO)
+// PostgreSQL + pgvector | Multi-tenant | Event-driven | Cognitive-ready
+// Fixes: onDelete em todas FKs, modelo Professional, CPF partial-index-only,
+//        Decimal(12,2) universal, ClinicalRecord → Professional
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMERAÇÕES GLOBAIS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  MASTER
+  GERENTE
+  MEDICO
+  ENFERMEIRA
+  TECNICA
+  CONCIERGE
+  ADMINISTRATIVO
+  FINANCEIRO
+}
+
+enum PatientStatus {
+  NOVA_LEAD
+  AGUARDANDO_AGENDAMENTO
+  AGENDADO
+  CONFIRMADO
+  CONSULTA
+  PROCEDIMENTO
+  LISTA_ESPERA
+  CANCELADO
+  FALTOU
+  REAGENDADO
+  INATIVO
+  AGUARDANDO_ATENDIMENTO
+}
+
+enum PatientRiskLevel {
+  PREVENTIVO
+  ATENCAO
+  PRIORITARIO
+  CRITICO
+}
+
+enum PatientTag {
+  GELADEIRA // paciente inativo há muito tempo
+  FROZEN // bloqueado temporariamente
+  DIAMANTE // paciente VIP / alto valor
+  APENAS_CONSULTA // não faz procedimentos
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  MISSED
+  RESCHEDULED
+  WAITLIST
+}
+
+enum AppointmentType {
+  CONSULTATION
+  PROCEDURE
+  RETURN
+  EVALUATION
+  TELECONSULTATION
+  EXAM_REVIEW
+}
+
+enum DocumentType {
+  PRESCRIPTION
+  PRESCRIPTION_CONTROLLED
+  CERTIFICATE
+  EXAM_REQUEST
+  REFERRAL
+  REPORT
+  CUSTOM
+}
+
+enum DocumentStatus {
+  DRAFT
+  SIGNED
+  PENDING_CFM_VALIDATION
+  SIGNED_VALIDATED
+  REVOKED
+  CANCELLED
+}
+
+enum TransactionType {
+  REVENUE
+  EXPENSE
+  REFUND
+  TRANSFER
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+  BANK_TRANSFER
+  HEALTH_INSURANCE
+  INSTALLMENT
+}
+
+enum InventoryMovementType {
+  ENTRY
+  EXIT
+  ADJUSTMENT
+  LOSS
+  TRANSFER
+  RESERVATION_CONSUME
+  RETURN
+}
+
+enum InventoryItemStatus {
+  ACTIVE
+  BLOCKED
+  EXPIRED
+}
+
+enum PurchaseOrderStatus {
+  SUGGESTED
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+  DIVERGENT
+}
+
+enum PurchaseOrderUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InventoryReservationStatus {
+  ACTIVE
+  CONSUMED
+  CANCELLED
+}
+
+enum InventoryLossType {
+  EXPIRY
+  ERROR
+  DAMAGE
+  THEFT
+  DISCARD
+  OTHER
+}
+
+enum InventoryAuditAction {
+  CREATE
+  UPDATE
+  MOVEMENT
+  RESERVATION
+  LOSS
+  PURCHASE
+  ADJUSTMENT
+  COUNT
+}
+
+enum DecisionProposalStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  MODIFIED_AND_APPROVED
+  EXECUTING
+  EXECUTED
+  EXPIRED
+  ESCALATED
+}
+
+enum DecisionProposalType {
+  CLINICAL
+  OPERATIONAL
+  FINANCIAL
+  RELATIONAL
+  STRATEGIC
+  INVENTORY
+}
+
+enum RiskLevel {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum CognitivePriority {
+  P0_CRITICAL
+  P1_HIGH
+  P2_OPTIMIZATION
+  P3_INFORMATIONAL
+}
+
+enum MemoryType {
+  CLINICAL_PATTERN
+  BEHAVIORAL_PATTERN
+  OPERATIONAL_PATTERN
+  FINANCIAL_PATTERN
+  PREFERENCE
+}
+
+enum FeatureFlagKey {
+  COGNITIVE_LEARNING
+  BEHAVIOR_TRACKING
+  PROACTIVE_SUGGESTIONS
+  COLLECTIVE_INTELLIGENCE
+  ANONYMOUS_BENCHMARK
+  LAB_ANALYSIS_AI
+  COGNITIVE_MEMORY
+  DIGITAL_TWIN
+  SCENARIO_SIMULATOR
+  ADAPTIVE_INTERFACE
+  DOCTOR_PROFILE_LEARNING
+  ORCHESTRATION_MODE
+  AUTONOMOUS_PLANNING
+  WEARABLES_INTEGRATION
+  LAB_DIRECT_INTEGRATION
+  TELEMEDICINE
+}
+
+enum ExamMarkerStatus {
+  LOW
+  IDEAL
+  HIGH
+  CRITICAL_LOW
+  CRITICAL_HIGH
+}
+
+enum CommunicationChannelType {
+  GENERAL
+  DOCTORS
+  RECEPTION
+  NURSING
+  EMERGENCY
+}
+
+enum MessagePriority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE_SOFT
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  SIGN
+  UPLOAD
+  DOWNLOAD
+  EXPORT
+  AI_GENERATE
+  AI_APPROVE
+  AI_REJECT
+  PERMISSION_CHANGE
+  ALERT_ACK
+  ALERT_SNOOZE
+  ALERT_RESOLVE
+  ALERT_DISMISS
+  WAITLIST_CONTACTED
+  WAITLIST_SCHEDULED
+  TASK_CREATE
+  TASK_COMPLETE
+  TASK_CANCEL
+  CANCEL
+  CONVERT
+  MARK_PAID
+  START
+  FINALIZE
+  STAGE_CHANGE
+}
+
+enum AlertSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  SNOOZED
+  RESOLVED
+  DISMISSED
+}
+
+enum AlertCategory {
+  CLINICAL_OPS
+  FINANCIAL_OPS
+  SCHEDULING
+}
+
+enum AlertOwnerRole {
+  MEDICO
+  GERENTE
+  ADMIN
+  ALL
+}
+
+enum WaitlistReason {
+  RETURN
+  IMPLANT
+  NEW_VISIT
+  OTHER
+}
+
+enum WaitlistEntryStatus {
+  OPEN
+  CONTACTED
+  SCHEDULED
+  CLOSED
+}
+
+enum TaskSource {
+  ALERT
+  SCORE
+  WAITLIST
+  FINANCE
+  MANUAL
+}
+
+enum TaskType {
+  CONTACT_PATIENT
+  SCHEDULE_VISIT
+  REQUEST_DOCUMENT
+  COLLECT_PAYMENT
+  FOLLOWUP_IMPLANT
+  FOLLOWUP_PROTOCOL
+  OTHER
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  SNOOZED
+  CANCELLED
+}
+
+enum TaskActionType {
+  CREATE
+  START
+  SNOOZE
+  COMPLETE
+  CANCEL
+  SYSTEM_UPDATE
+}
+
+enum FinancialAccountType {
+  CASH
+  BANK
+  PIX
+  OTHER
+}
+
+enum CounterpartyType {
+  PATIENT
+  SUPPLIER
+  OTHER
+}
+
+enum ReceivableStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PayableCategory {
+  RENT
+  SUPPLIES
+  STAFF
+  EQUIPMENT
+  MARKETING
+  TAX
+  OTHER
+}
+
+enum PayableStatus {
+  OPEN
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum LedgerEntryType {
+  RECEIPT
+  PAYMENT
+  TRANSFER
+  ADJUSTMENT
+}
+
+enum ProtocolFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 1 — IDENTIDADE E ACESSO
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Organization {
+  id         String    @id @default(uuid())
+  name       String
+  document   String?
+  plan_tier  String    @default("CORE")
+  is_active  Boolean   @default(true)
+  settings   Json?     @default("{}")
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  clinics Clinic[]
+  users   User[]
+
+  @@index([is_active])
+  @@map("organizations")
+}
+
+model Clinic {
+  id              String    @id @default(uuid())
+  organization_id String
+  name            String
+  document        String?
+  address         Json?
+  phone           String?
+  email           String?
+  timezone        String    @default("America/Sao_Paulo")
+  specialty       String?
+  settings        Json      @default("{}")
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  organization           Organization           @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  users                  User[]
+  patients               Patient[]
+  professionals          Professional[]
+  appointments           Appointment[]
+  clinical_records       ClinicalRecord[]
+  exams                  Exam[]
+  documents              Document[]
+  transactions           Transaction[]
+  inventory_items        InventoryItem[]
+  events                 Event[]
+  decision_proposals     DecisionProposal[]
+  cognitive_memory       CognitiveMemory[]
+  behavior_patterns      BehaviorPattern[]
+  digital_twin_snapshots DigitalTwinSnapshot[]
+  feature_flags          FeatureFlag[]
+  communication_channels CommunicationChannel[]
+  services               Service[]
+  daily_closings         DailyClosing[]
+  clinic_metrics         ClinicMetricDaily[]
+  ai_action_logs         AiActionLog[]
+  notification_logs      NotificationLog[]
+  wearable_data_points   WearableDataPoint[]
+  waitlist_entries       WaitlistEntry[]
+  alerts                 Alert[]
+  cognitive_scores       PatientCognitiveScore[]
+  tasks                  Task[]
+  alert_rule_configs     AlertRuleConfig[]
+  playbook_config        PlaybookConfig?
+  consent_records        PatientConsentRecord[]
+  budgets                Budget[]
+  message_templates      MessageTemplate[]
+  patient_metrics        PatientMetrics[]
+  treatment_protocols    TreatmentProtocol[]
+  hormone_implants       HormoneImplant[]
+  financial_accounts     FinancialAccount[]
+  counterparties         Counterparty[]
+  receivables            Receivable[]
+  payables               Payable[]
+  ledger_entries         LedgerEntry[]
+  financial_action_logs  FinancialActionLog[]
+  suppliers              Supplier[]
+  purchase_orders        PurchaseOrder[]
+  inventory_reservations InventoryReservation[]
+  inventory_losses       InventoryLoss[]
+  inventory_audit_logs   InventoryAuditLog[]
+
+  @@index([organization_id, is_active])
+  @@map("clinics")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  organization_id String
+  clinic_id       String
+  name            String
+  email           String
+  password_hash   String
+  role            UserRole
+  permissions     Json      @default("{}")
+  is_active       Boolean   @default(true)
+  last_login_at   DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  organization       Organization           @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  clinic             Clinic                 @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  professional       Professional?
+  sessions           Session[]
+  audit_logs         AuditLog[]
+  approved_proposals DecisionProposal[]     @relation("Approver")
+  documents          Document[]             @relation("DocumentCreator")
+  documents_signed   Document[]             @relation("DocumentSigner")
+  signed_documents   DocumentSignature[]
+  messages_sent      CommunicationMessage[]
+  notification_logs  NotificationLog[]
+
+  @@unique([email, clinic_id])
+  @@index([clinic_id, role, is_active])
+  @@index([email])
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  user_id    String
+  clinic_id  String
+  token_hash String   @unique
+  ip_address String?
+  user_agent String?
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, expires_at])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 1b — PROFISSIONAIS (entidade separada de Users)
+// Decisão arquitetural congelada: permite médicos externos sem login
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Professional {
+  id         String    @id @default(uuid())
+  clinic_id  String
+  user_id    String?   @unique // link opcional a User (médico com acesso ao sistema)
+  name       String
+  specialty  String?
+  crm        String? // Conselho Regional de Medicina
+  crm_state  String? // UF do CRM
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  clinic           Clinic                 @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  user             User?                  @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  appointments     Appointment[]
+  clinical_records ClinicalRecord[]
+  schedules        ProfessionalSchedule[]
+
+  @@index([clinic_id, is_active])
+  @@map("professionals")
+}
+
+model ProfessionalSchedule {
+  id              String   @id @default(uuid())
+  professional_id String
+  clinic_id       String
+  day_of_week     Int // 0=Dom … 6=Sáb
+  start_time      String // "08:00"
+  end_time        String // "18:00"
+  slot_duration   Int      @default(30) // minutos
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  professional Professional @relation(fields: [professional_id], references: [id], onDelete: Cascade)
+
+  @@unique([professional_id, day_of_week])
+  @@index([clinic_id, day_of_week])
+  @@map("professional_schedules")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 2 — PACIENTES (CRM CLÍNICO)
+// CPF único gerenciado APENAS via partial index SQL (WHERE deleted_at IS NULL)
+// O @@unique do Prisma foi REMOVIDO intencionalmente para suportar soft delete
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Patient {
+  id               String                       @id @default(uuid())
+  clinic_id        String
+  full_name        String
+  birth_date       DateTime
+  sex              String // M | F | OTHER
+  cpf              String? // stored encrypted as <iv_hex>:<cipher_hex>
+  cpf_search_hash  String? // SHA-256 of normalized CPF for lookup
+  rg               String?
+  nationality      String    @default("BR")
+  foreign_doc_type  String?
+  foreign_doc_number String?
+  phone            String  // stored encrypted
+  email            String?
+  address          Json?
+  insurance        Json?
+  preferences      Json?
+  risk_score       Float                        @default(0)
+  risk_level       PatientRiskLevel             @default(PREVENTIVO)
+  current_status   PatientStatus                @default(NOVA_LEAD)
+  cognitive_vector Unsupported("vector(1536)")?
+  tags             PatientTag[]                 @default([])
+  notes            String?
+  is_active        Boolean                      @default(true)
+  created_at       DateTime                     @default(now())
+  updated_at       DateTime                     @updatedAt
+  deleted_at       DateTime?
+
+  clinic            Clinic                 @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  status_history    PatientStatusHistory[]
+  appointments      Appointment[]
+  clinical_records  ClinicalRecord[]
+  exams             Exam[]
+  documents         Document[]
+  transactions      Transaction[]
+  cognitive_memory  CognitiveMemory[]
+  form_responses    FormResponse[]
+  notification_logs NotificationLog[]
+  wearable_data     WearableDataPoint[]
+  consent_records   PatientConsentRecord[]
+  budgets           Budget[]
+  patient_metrics   PatientMetrics[]
+  treatment_protocols TreatmentProtocol[]
+  hormone_implants  HormoneImplant[]
+  waitlist_entries  WaitlistEntry[]
+  alerts            Alert[]
+  cognitive_score   PatientCognitiveScore?
+  tasks             Task[]
+  receivables       Receivable[]
+
+  @@index([clinic_id, cpf]) // para busca por CPF (partial index cuida da unicidade)
+  @@index([clinic_id, current_status])
+  @@index([clinic_id, risk_level])
+  @@index([clinic_id, is_active])
+  @@map("patients")
+}
+
+model PatientStatusHistory {
+  id          String         @id @default(uuid())
+  patient_id  String
+  clinic_id   String
+  from_status PatientStatus?
+  to_status   PatientStatus
+  changed_by  String // user_id
+  reason      String?
+  created_at  DateTime       @default(now())
+
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+
+  @@index([patient_id, created_at])
+  @@map("patient_status_history")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 3 — AGENDA INTELIGENTE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Service {
+  id           String   @id @default(uuid())
+  clinic_id    String
+  name         String
+  description  String?
+  category     String?
+  duration_min Int      @default(30)
+  price              Decimal? @db.Decimal(12, 2)
+  color              String?
+  is_active          Boolean  @default(true)
+  requires_document  Boolean  @default(false)
+  can_be_recurring   Boolean  @default(false)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  appointments Appointment[]
+
+  @@index([clinic_id, is_active])
+  @@map("services")
+}
+
+model Appointment {
+  id                  String            @id @default(uuid())
+  clinic_id           String
+  patient_id          String
+  professional_id     String // referencia professionals.id (não users)
+  service_id          String?
+  type                AppointmentType   @default(CONSULTATION)
+  status              AppointmentStatus @default(SCHEDULED)
+  start_time          DateTime
+  end_time            DateTime
+  checked_in_at         DateTime?
+  checked_out_at        DateTime?
+  started_at            DateTime?
+  finalized_at          DateTime?
+  finalization_note     String?
+  return_scheduled      Boolean           @default(false)
+  return_exception_note String?
+  kanban_stage          String?
+  stage_skipped_reason  String?
+  protocol_id           String?
+  notes               String?
+  cancellation_reason String?
+  is_telemedicine     Boolean           @default(false)
+  created_at          DateTime          @default(now())
+  updated_at          DateTime          @updatedAt
+  deleted_at          DateTime?
+
+  clinic           Clinic           @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient          Patient          @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  professional     Professional     @relation(fields: [professional_id], references: [id], onDelete: Restrict)
+  service          Service?         @relation(fields: [service_id], references: [id], onDelete: SetNull)
+  clinical_records ClinicalRecord[]
+  transactions     Transaction[]
+  patient_metrics  PatientMetrics[]
+  hormone_implants HormoneImplant[]
+  documents        Document[]
+  receivables      Receivable[]
+
+  @@index([clinic_id, start_time])
+  @@index([clinic_id, status, start_time])
+  @@index([patient_id, start_time])
+  @@index([professional_id, start_time])
+  @@map("appointments")
+}
+
+model WaitlistEntry {
+  id                    String             @id @default(uuid())
+  clinic_id             String
+  patient_id            String
+  service_id            String?
+  professional_id       String?
+  priority              Int                @default(0)
+  priority_score        Int                @default(0)
+  reason                WaitlistReason     @default(NEW_VISIT)
+  status                WaitlistEntryStatus @default(OPEN)
+  preferred_days_json   Json?
+  preferred_shift       String?
+  preferred_window_start String?
+  preferred_window_end   String?
+  notes                 String?
+  created_at            DateTime           @default(now())
+  resolved_at           DateTime?
+
+  clinic  Clinic  @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, status, priority_score])
+  @@index([clinic_id, resolved_at, priority])
+  @@map("waitlist_entries")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 4 — PRONTUÁRIO E EXAMES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ClinicalRecord {
+  id              String    @id @default(uuid())
+  clinic_id       String
+  patient_id      String
+  appointment_id  String?
+  professional_id String // referencia professionals.id
+  transcription   String?
+  structured_data Json      @default("{}")
+  summary_ai      String?
+  voice_file_url  String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  clinic       Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient      Patient      @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  appointment  Appointment? @relation(fields: [appointment_id], references: [id], onDelete: SetNull)
+  professional Professional @relation(fields: [professional_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, patient_id, created_at])
+  @@map("clinical_records")
+}
+
+model Exam {
+  id                String    @id @default(uuid())
+  clinic_id         String
+  patient_id        String
+  exam_date         DateTime
+  laboratory        String?
+  file_url          String?
+  ocr_raw           String?
+  processing_status String    @default("PENDING")
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  deleted_at        DateTime?
+
+  clinic  Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient Patient      @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  markers ExamMarker[]
+
+  @@index([clinic_id, patient_id, exam_date])
+  @@map("exams")
+}
+
+model ExamMarker {
+  id                String           @id @default(uuid())
+  exam_id           String
+  patient_id        String
+  marker_name       String
+  standardized_name String?
+  value             Float
+  unit              String?
+  ideal_min         Float?
+  ideal_max         Float?
+  functional_min    Float?
+  functional_max    Float?
+  status            ExamMarkerStatus
+  trend             String? // IMPROVING | STABLE | WORSENING
+  created_at        DateTime         @default(now())
+
+  exam Exam @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+
+  @@index([patient_id, standardized_name, created_at(sort: Desc)])
+  @@index([exam_id])
+  @@map("exam_markers")
+}
+
+model BiomarkerReference {
+  id                String   @id @default(uuid())
+  clinic_id         String
+  standardized_name String
+  unit              String?
+  ideal_min         Float?
+  ideal_max         Float?
+  functional_min    Float?
+  functional_max    Float?
+  notes             String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@unique([clinic_id, standardized_name])
+  @@map("biomarker_references")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 5 — DOCUMENTOS MÉDICOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DocumentTemplate {
+  id         String       @id @default(uuid())
+  clinic_id  String
+  name       String
+  type       DocumentType
+  content    String
+  is_active  Boolean      @default(true)
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
+
+  documents Document[]
+
+  @@index([clinic_id, type, is_active])
+  @@map("document_templates")
+}
+
+model Document {
+  id                       String         @id @default(uuid())
+  clinic_id                String
+  patient_id               String
+  appointment_id           String?
+  created_by               String
+  signed_by                String?
+  template_id              String?
+  type                     DocumentType
+  status                   DocumentStatus @default(DRAFT)
+  title                    String
+  content                  String
+  document_hash            String?
+  pdf_object_key           String?
+  validated_pdf_object_key String?
+  file_url                 String?
+  metadata                 Json?          @default("{}")
+  signed_at                DateTime?
+  locked_at                DateTime?
+  created_at               DateTime       @default(now())
+  updated_at               DateTime       @updatedAt
+  deleted_at               DateTime?
+
+  clinic      Clinic             @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient     Patient            @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  creator     User               @relation("DocumentCreator", fields: [created_by], references: [id], onDelete: Restrict)
+  signer      User?              @relation("DocumentSigner", fields: [signed_by], references: [id], onDelete: SetNull)
+  template    DocumentTemplate?  @relation(fields: [template_id], references: [id], onDelete: SetNull)
+  appointment Appointment?       @relation(fields: [appointment_id], references: [id], onDelete: SetNull)
+  signatures  DocumentSignature[]
+
+  @@index([clinic_id, patient_id, status])
+  @@index([clinic_id, appointment_id])
+  @@index([clinic_id, type, created_at])
+  @@map("documents")
+}
+
+model DocumentSignature {
+  id          String   @id @default(uuid())
+  document_id String
+  signed_by   String // user_id
+  signature   String
+  signed_at   DateTime @default(now())
+  ip_address  String?
+
+  document Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [signed_by], references: [id], onDelete: Restrict)
+
+  @@map("document_signatures")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 6 — FINANCEIRO
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Transaction {
+  id              String            @id @default(uuid())
+  clinic_id       String
+  patient_id      String?
+  appointment_id  String?
+  type            TransactionType
+  status          TransactionStatus @default(PENDING)
+  amount          Decimal           @db.Decimal(12, 2)
+  payment_method  PaymentMethod?
+  description     String?
+  reference_code  String?
+  due_date        DateTime?
+  paid_at         DateTime?
+  category        String?
+  insurance_claim Json?
+  created_by      String? // user_id
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  deleted_at      DateTime?
+
+  clinic      Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient     Patient?     @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+  appointment Appointment? @relation(fields: [appointment_id], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, status, due_date])
+  @@index([clinic_id, type, created_at])
+  @@map("transactions")
+}
+
+model DailyClosing {
+  id                     String   @id @default(uuid())
+  clinic_id              String
+  closing_date           DateTime
+  total_revenue          Decimal  @db.Decimal(12, 2)
+  total_expenses         Decimal  @db.Decimal(12, 2)
+  net_result             Decimal  @db.Decimal(12, 2)
+  appointments_total     Int
+  appointments_completed Int
+  closing_summary        Json     @default("{}")
+  closed_by              String // user_id
+  closed_at              DateTime @default(now())
+  has_pendencies         Boolean  @default(false)
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@unique([clinic_id, closing_date])
+  @@map("daily_closings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 7 — ESTOQUE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id                   String              @id @default(uuid())
+  clinic_id            String
+  name                 String
+  technical_name       String?
+  internal_code        String?
+  qr_code              String?
+  category             String?
+  subcategory          String?
+  manufacturer         String?
+  description          String?
+  unit                 String              @default("UN")
+  quantity             Int                 @default(0)
+  minimum_level        Int                 @default(0)
+  ideal_stock          Int                 @default(0)
+  max_stock            Int                 @default(0)
+  unit_cost            Decimal?            @db.Decimal(12, 2)
+  average_cost         Decimal?            @db.Decimal(12, 2)
+  barcode              String?
+  location             String?
+  storage_sector       String?
+  temperature_min      Float?
+  temperature_max      Float?
+  expiry_date          DateTime?
+  batch_number         String?
+  supplier_id          String?
+  secondary_supplier_id String?
+  photo_url            String?
+  status               InventoryItemStatus @default(ACTIVE)
+  is_active            Boolean             @default(true)
+  consumption_30d      Float               @default(0)
+  consumption_90d      Float               @default(0)
+  lead_time_days       Int                 @default(1)
+  days_remaining       Int?
+  abc_class            String?
+  risk_score           Int                 @default(0)
+  last_counted_at      DateTime?
+  created_at           DateTime            @default(now())
+  updated_at           DateTime            @updatedAt
+  deleted_at           DateTime?
+
+  clinic            Clinic                @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  supplier          Supplier?             @relation("primary_supplier", fields: [supplier_id], references: [id], onDelete: SetNull)
+  secondary_supplier Supplier?            @relation("secondary_supplier", fields: [secondary_supplier_id], references: [id], onDelete: SetNull)
+  movements         InventoryMovement[]
+  reservations      InventoryReservation[]
+  losses            InventoryLoss[]
+  purchase_order_items PurchaseOrderItem[]
+  audit_logs        InventoryAuditLog[]
+
+  @@index([clinic_id, quantity, minimum_level])
+  @@index([clinic_id, status])
+  @@index([clinic_id, expiry_date])
+  @@map("inventory_items")
+}
+
+model InventoryMovement {
+  id                    String                @id @default(uuid())
+  item_id               String
+  clinic_id             String
+  type                  InventoryMovementType
+  quantity              Int
+  unit_cost             Decimal?              @db.Decimal(12, 2)
+  ocr_source            String?
+  ocr_data              Json?
+  ocr_validated         Boolean               @default(false)
+  ocr_validated_by      String?
+  ocr_validated_by2     String?
+  ocr_validated_at      DateTime?
+  notes                 String?
+  patient_id            String?
+  appointment_id        String?
+  protocol_id           String?
+  reservation_id        String?
+  loss_type             InventoryLossType?
+  purchase_order_item_id String?
+  performed_by          String
+  created_at            DateTime              @default(now())
+
+  item InventoryItem @relation(fields: [item_id], references: [id], onDelete: Restrict)
+
+  @@index([item_id, created_at])
+  @@index([clinic_id, type, created_at])
+  @@map("inventory_movements")
+}
+
+model Supplier {
+  id             String   @id @default(uuid())
+  clinic_id      String
+  name           String
+  document       String?
+  email          String?
+  phone          String?
+  contact_name   String?
+  address        String?
+  website        String?
+  payment_terms  String?
+  lead_time_days Int      @default(7)
+  notes          String?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  deleted_at     DateTime?
+
+  primary_items   InventoryItem[] @relation("primary_supplier")
+  secondary_items InventoryItem[] @relation("secondary_supplier")
+  purchase_orders PurchaseOrder[]
+  clinic          Clinic          @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, is_active])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id                   String               @id @default(uuid())
+  clinic_id            String
+  supplier_id          String?
+  status               PurchaseOrderStatus  @default(SUGGESTED)
+  urgency              PurchaseOrderUrgency @default(LOW)
+  total_amount         Decimal              @db.Decimal(12, 2) @default(0)
+  justification        String?
+  requested_by_user_id String?
+  approved_by_user_id  String?
+  sent_at              DateTime?
+  received_at          DateTime?
+  notes                String?
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @updatedAt
+
+  supplier Supplier?           @relation(fields: [supplier_id], references: [id], onDelete: SetNull)
+  items    PurchaseOrderItem[]
+  clinic   Clinic              @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, status])
+  @@index([clinic_id, urgency])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id                   String   @id @default(uuid())
+  purchase_order_id    String
+  item_id              String
+  quantity_requested   Int
+  quantity_received    Int?
+  unit_cost_estimated  Decimal? @db.Decimal(12, 2)
+  unit_cost_actual     Decimal? @db.Decimal(12, 2)
+  notes                String?
+
+  purchase_order PurchaseOrder @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  item           InventoryItem @relation(fields: [item_id], references: [id], onDelete: Restrict)
+
+  @@map("purchase_order_items")
+}
+
+model InventoryReservation {
+  id                 String                     @id @default(uuid())
+  clinic_id          String
+  item_id            String
+  patient_id         String?
+  appointment_id     String?
+  protocol_id        String?
+  quantity_reserved  Int
+  status             InventoryReservationStatus @default(ACTIVE)
+  reserved_at        DateTime                   @default(now())
+  consumed_at        DateTime?
+  cancelled_at       DateTime?
+  created_by_user_id String
+
+  item   InventoryItem @relation(fields: [item_id], references: [id], onDelete: Restrict)
+  clinic Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, status])
+  @@index([item_id, status])
+  @@map("inventory_reservations")
+}
+
+model InventoryLoss {
+  id                  String            @id @default(uuid())
+  clinic_id           String
+  item_id             String
+  quantity            Int
+  loss_type           InventoryLossType @default(OTHER)
+  estimated_cost      Decimal           @db.Decimal(12, 2) @default(0)
+  reason              String
+  photo_url           String?
+  registered_by_user_id String
+  created_at          DateTime          @default(now())
+
+  item   InventoryItem @relation(fields: [item_id], references: [id], onDelete: Restrict)
+  clinic Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, loss_type])
+  @@index([clinic_id, created_at])
+  @@map("inventory_losses")
+}
+
+model InventoryAuditLog {
+  id            String               @id @default(uuid())
+  clinic_id     String
+  item_id       String?
+  action        InventoryAuditAction
+  actor_user_id String?
+  before_json   Json?
+  after_json    Json?
+  created_at    DateTime             @default(now())
+
+  item   InventoryItem? @relation(fields: [item_id], references: [id], onDelete: SetNull)
+  clinic Clinic         @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, created_at])
+  @@index([item_id, created_at])
+  @@map("inventory_audit_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 8 — COMUNICAÇÃO INTERNA
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CommunicationChannel {
+  id         String                   @id @default(uuid())
+  clinic_id  String
+  name       String
+  type       CommunicationChannelType
+  is_active  Boolean                  @default(true)
+  created_at DateTime                 @default(now())
+
+  clinic   Clinic                 @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  messages CommunicationMessage[]
+
+  @@index([clinic_id, type])
+  @@map("communication_channels")
+}
+
+model CommunicationMessage {
+  id         String          @id @default(uuid())
+  channel_id String
+  clinic_id  String
+  sender_id  String
+  content    String
+  priority   MessagePriority @default(NORMAL)
+  is_read    Boolean         @default(false)
+  read_at    DateTime?
+  created_at DateTime        @default(now())
+  deleted_at DateTime?
+
+  channel CommunicationChannel @relation(fields: [channel_id], references: [id], onDelete: Restrict)
+  sender  User                 @relation(fields: [sender_id], references: [id], onDelete: Restrict)
+
+  @@index([channel_id, created_at])
+  @@index([clinic_id, priority, is_read])
+  @@map("communication_messages")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 9 — FORMULÁRIOS INTELIGENTES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FormTemplate {
+  id          String    @id @default(uuid())
+  clinic_id   String
+  title       String
+  description String?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  fields    FormField[]
+  responses FormResponse[]
+
+  @@index([clinic_id, is_active])
+  @@map("form_templates")
+}
+
+model FormField {
+  id          String  @id @default(uuid())
+  template_id String
+  label       String
+  type        String // TEXT | NUMBER | SELECT | MULTISELECT | DATE | BOOLEAN
+  options     Json?
+  is_required Boolean @default(false)
+  order       Int     @default(0)
+
+  template FormTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+
+  @@map("form_fields")
+}
+
+model FormResponse {
+  id          String   @id @default(uuid())
+  template_id String
+  patient_id  String
+  clinic_id   String
+  answers     Json
+  completed   Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  template FormTemplate @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  patient  Patient      @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, template_id, completed])
+  @@map("form_responses")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 10 — EVENT STORE (append-only, particionada via SQL)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Event {
+  id            String    @id @default(uuid())
+  clinic_id     String
+  event_type    String
+  event_version String    @default("1.0")
+  entity_type   String?
+  entity_id     String?
+  actor_id      String? // user_id (null = sistema/IA)
+  payload       Json      @default("{}")
+  processed     Boolean   @default(false)
+  processed_at  DateTime?
+  created_at    DateTime  @default(now())
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, created_at(sort: Desc)])
+  @@index([clinic_id, event_type, created_at(sort: Desc)])
+  @@index([entity_type, entity_id, created_at(sort: Desc)])
+  @@index([processed, created_at])
+  @@map("events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 11 — DECISION PROPOSAL (primitivo central do AYRON)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DecisionProposal {
+  id            String                 @id @default(uuid())
+  clinic_id     String
+  proposal_type DecisionProposalType
+  priority      CognitivePriority      @default(P2_OPTIMIZATION)
+  risk_level    RiskLevel              @default(LOW)
+  status        DecisionProposalStatus @default(PENDING_APPROVAL)
+
+  // raciocínio da IA
+  context         String
+  analysis        String
+  ai_reasoning    String
+  proposed_action Json
+  expected_impact Json
+  confidence      Float
+
+  // explicabilidade e auditoria
+  data_sources       Json
+  data_snapshot_hash String?
+  ai_model_version   String?
+
+  // governança
+  required_role    UserRole
+  expires_at       DateTime?
+  created_by_agent String // "ClinicalAgent" | "FinanceAgent" | etc.
+
+  // ciclo de vida
+  approved_by       String?
+  rejection_reason  String?
+  modification_note String?
+  approved_at       DateTime?
+  executed_at       DateTime?
+  execution_result  Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  clinic   Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  approver User?  @relation("Approver", fields: [approved_by], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, status, priority])
+  @@index([clinic_id, status, expires_at])
+  @@index([clinic_id, proposal_type, created_at])
+  @@map("decision_proposals")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 12 — AUDITORIA IMUTÁVEL
+// Imutabilidade garantida por trigger PostgreSQL (003_audit_immutability.sql)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id                 String      @id @default(uuid())
+  clinic_id          String?
+  organization_id    String?
+  actor_id           String?
+  actor_role         UserRole?
+  action             AuditAction
+  entity_type        String?
+  entity_id          String?
+  proposal_id        String?
+  metadata           Json        @default("{}")
+  data_before        Json?
+  data_after         Json?
+  data_snapshot_hash String?
+  ip_address         String?
+  session_id         String?
+  ai_model_version   String?
+  created_at         DateTime    @default(now())
+
+  actor User? @relation(fields: [actor_id], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, created_at(sort: Desc)])
+  @@index([actor_id, created_at(sort: Desc)])
+  @@index([entity_type, entity_id, created_at(sort: Desc)])
+  @@index([action, created_at(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model AiActionLog {
+  id            String   @id @default(uuid())
+  clinic_id     String
+  agent_name    String
+  model_version String?
+  input_summary String
+  output_type   String
+  output_id     String?
+  confidence    Float?
+  latency_ms    Int?
+  tokens_used   Int?
+  cost_usd      Float?
+  success       Boolean  @default(true)
+  error_message String?
+  created_at    DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, agent_name, created_at])
+  @@index([success, created_at])
+  @@map("ai_action_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 13 — MEMÓRIA COGNITIVA (V6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CognitiveMemory {
+  id              String                       @id @default(uuid())
+  clinic_id       String
+  patient_id      String?
+  memory_type     MemoryType
+  memory_text     String
+  embedding       Unsupported("vector(1536)")?
+  relevance_score Float                        @default(0.5)
+  source_events   Json?
+  is_active       Boolean                      @default(true)
+  created_at      DateTime                     @default(now())
+  updated_at      DateTime                     @updatedAt
+  expires_at      DateTime?
+
+  clinic  Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient Patient? @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, memory_type, is_active])
+  @@index([patient_id, memory_type])
+  @@map("cognitive_memory")
+}
+
+model BehaviorPattern {
+  id             String   @id @default(uuid())
+  clinic_id      String
+  user_id        String?
+  pattern_type   String
+  description    String
+  confidence     Float    @default(0.5)
+  sample_count   Int      @default(1)
+  pattern_data   Json     @default("{}")
+  detected_at    DateTime @default(now())
+  last_confirmed DateTime @default(now())
+  is_active      Boolean  @default(true)
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, pattern_type, is_active])
+  @@map("behavior_patterns")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 14 — DIGITAL TWIN E ANALYTICS (V8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DigitalTwinSnapshot {
+  id                     String   @id @default(uuid())
+  clinic_id              String
+  snapshot_type          String // DAILY_STATE | SIMULATION | SCENARIO
+  simulation_data        Json
+  prediction_window_days Int      @default(30)
+  confidence             Float    @default(0.5)
+  scenario_description   String?
+  created_at             DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, snapshot_type, created_at(sort: Desc)])
+  @@map("digital_twin_snapshots")
+}
+
+model ClinicMetricDaily {
+  id                     String   @id @default(uuid())
+  clinic_id              String
+  metric_date            DateTime
+  appointments_scheduled Int      @default(0)
+  appointments_completed Int      @default(0)
+  appointments_missed    Int      @default(0)
+  appointments_cancelled Int      @default(0)
+  new_patients           Int      @default(0)
+  returning_patients     Int      @default(0)
+  revenue_total          Decimal  @default(0) @db.Decimal(12, 2)
+  avg_consultation_min   Float?
+  occupation_rate        Float?
+  clinic_health_score    Float?
+  score_breakdown        Json?
+  created_at             DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@unique([clinic_id, metric_date])
+  @@index([clinic_id, metric_date(sort: Desc)])
+  @@map("clinic_metrics_daily")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 15 — FEATURE FLAGS E NOTIFICAÇÕES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FeatureFlag {
+  id         String         @id @default(uuid())
+  clinic_id  String
+  flag       FeatureFlagKey
+  enabled    Boolean        @default(false)
+  config     Json?          @default("{}")
+  enabled_at DateTime?
+  updated_by String?
+  updated_at DateTime       @updatedAt
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+
+  @@unique([clinic_id, flag])
+  @@map("feature_flags")
+}
+
+model NotificationLog {
+  id         String    @id @default(uuid())
+  clinic_id  String
+  patient_id String?
+  user_id    String?
+  channel    String // WEBSOCKET | PUSH | EMAIL | WHATSAPP
+  event_type String
+  content    Json
+  sent       Boolean   @default(false)
+  sent_at    DateTime?
+  error      String?
+  created_at DateTime  @default(now())
+
+  clinic  Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient Patient? @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, sent, created_at])
+  @@map("notification_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 16 — INTEGRAÇÕES FUTURAS (V19)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WearableDataPoint {
+  id             String   @id @default(uuid())
+  patient_id     String
+  clinic_id      String
+  source         String // APPLE_HEALTH | GOOGLE_FIT | OURA | DEXCOM
+  metric_type    String // HRV | HEART_RATE | SLEEP_SCORE | GLUCOSE
+  value          Float
+  unit           String?
+  recorded_at    DateTime
+  is_anomaly     Boolean  @default(false)
+  clinical_notes String?
+  created_at     DateTime @default(now())
+
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  clinic  Clinic  @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([patient_id, metric_type, recorded_at(sort: Desc)])
+  @@map("wearable_data_points")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 17 — CONSENTIMENTO LGPD (PatientConsentRecord)
+// Granular: paciente controla quais dados podem ser usados e por quem
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ConsentType {
+  TREATMENT_DATA // uso de dados para tratamento clínico
+  MARKETING // comunicações e conteúdo educativo
+  RESEARCH_ANONYMOUS // pesquisa com dados anonimizados
+  THIRD_PARTY_SHARING // compartilhamento com terceiros (labs, convênios)
+  AI_PROCESSING // processamento por IA para sugestões
+  WEARABLE_INTEGRATION // recebimento de dados de dispositivos
+  TELEMEDICINE // consultas por vídeo
+}
+
+enum ConsentStatus {
+  GRANTED
+  REVOKED
+  EXPIRED
+}
+
+model PatientConsentRecord {
+  id           String        @id @default(uuid())
+  clinic_id    String
+  patient_id   String
+  consent_type ConsentType
+  status       ConsentStatus @default(GRANTED)
+  granted_at   DateTime      @default(now())
+  expires_at   DateTime? // null = sem expiração
+  revoked_at   DateTime?
+  ip_address   String?
+  channel      String        @default("WEB") // WEB | APP | PAPER | VERBAL
+  notes        String?
+  document_url String? // PDF do termo assinado digitalmente
+
+  clinic  Clinic  @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+
+  @@unique([patient_id, consent_type, clinic_id])
+  @@index([clinic_id, patient_id, status])
+  @@index([clinic_id, consent_type, status])
+  @@map("patient_consent_records")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 18 — ORÇAMENTOS (Financeiro submódulo)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum BudgetStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model Budget {
+  id              String       @id @default(uuid())
+  clinic_id       String
+  patient_id      String
+  professional_id String?
+  status          BudgetStatus @default(DRAFT)
+  total_amount    Decimal      @db.Decimal(12, 2)
+  discount        Decimal      @default(0) @db.Decimal(12, 2)
+  notes           String?
+  valid_until     DateTime?
+  converted_at    DateTime?
+  appointment_id  String?
+  receivable_id   String?
+  items           Json         @default("[]")
+  created_by      String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  deleted_at      DateTime?
+
+  clinic  Clinic  @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, status, created_at])
+  @@index([patient_id, status])
+  @@map("budgets")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 19 — TEMPLATES DE MENSAGEM (Comunicação)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MessageTemplate {
+  id         String   @id @default(uuid())
+  clinic_id  String
+  name       String
+  content    String
+  channel    String   @default("INTERNAL")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+
+  @@index([clinic_id, channel, is_active])
+  @@map("message_templates")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA 20 — PRONTUÁRIO ENDÓCRINO (Métricas, Protocolos, Implantes)
+// Sprint 2 — Endocrinologia & Alta Performance
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ProtocolType {
+  EMAGRECIMENTO
+  GANHO_MASSA
+  IMPLANTE_HORMONAL
+  SOROTERAPIA
+  LONGEVIDADE
+  NUTRICIONAL
+  PERSONALIZADO
+}
+
+enum ProtocolStatus {
+  ATIVO
+  PAUSADO
+  FINALIZADO
+  SUSPENSO
+}
+
+model PatientMetrics {
+  id             String    @id @default(uuid())
+  clinic_id      String
+  patient_id     String
+  appointment_id String?
+  recorded_by    String    // professional_id
+
+  weight_kg       Decimal? @db.Decimal(5, 2)
+  height_cm       Decimal? @db.Decimal(5, 1)
+  bmi             Decimal? @db.Decimal(5, 2)
+  body_fat_pct    Decimal? @db.Decimal(5, 2)
+  lean_mass_kg    Decimal? @db.Decimal(5, 2)
+  waist_cm        Decimal? @db.Decimal(5, 1)
+  bp_systolic       Int?
+  bp_diastolic      Int?
+  heart_rate        Int?
+  is_bioimpedance   Boolean  @default(false)
+  visceral_fat      Decimal? @db.Decimal(5, 2)
+  bmr               Int?
+  muscle_mass_kg    Decimal? @db.Decimal(5, 2)
+  attachment_key    String?
+  extraction_raw    Json?
+  notes             String?
+
+  created_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  clinic      Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient     Patient      @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  appointment Appointment? @relation(fields: [appointment_id], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, patient_id])
+  @@index([patient_id, created_at(sort: Desc)])
+  @@map("patient_metrics")
+}
+
+model TreatmentProtocol {
+  id          String         @id @default(uuid())
+  clinic_id   String
+  patient_id  String
+  type        ProtocolType
+  name        String
+  description String?
+  start_date  DateTime
+  end_date    DateTime?
+  status      ProtocolStatus @default(ATIVO)
+  notes       String?
+  created_by  String
+  total_sessions    Int?
+  frequency         ProtocolFrequency?
+  preferred_weekday Int?
+  preferred_time    String?
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  clinic  Clinic  @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, patient_id, status])
+  @@map("treatment_protocols")
+}
+
+model HormoneImplant {
+  id               String    @id @default(uuid())
+  clinic_id        String
+  patient_id       String
+  appointment_id   String?
+  applied_by       String    // professional_id
+
+  hormone_type     String
+  dosage_mg        Decimal   @db.Decimal(8, 2)
+  application_date DateTime
+  lot_number       String?
+  next_change_date DateTime?
+  site             String?
+  observations     String?
+
+  created_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  clinic      Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient     Patient      @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  appointment Appointment? @relation(fields: [appointment_id], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, patient_id])
+  @@index([next_change_date])
+  @@map("hormone_implants")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA COGNITIVA — ALERTAS INTELIGENTES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Alert {
+  id                   String          @id @default(uuid())
+  clinic_id            String
+  patient_id           String?
+  appointment_id       String?
+  rule_key             String
+  category             AlertCategory
+  severity             AlertSeverity
+  owner_role_target    AlertOwnerRole  @default(ALL)
+  title                String
+  message              String
+  rationale            Json            // string[] bullets
+  suggested_actions    Json            // {key:string, label:string}[]
+  status               AlertStatus     @default(OPEN)
+  due_at               DateTime?
+  snoozed_until        DateTime?
+  dedup_key            String          // prevent duplicates: clinic+patient+rule+window
+  score                Int             @default(0)
+  last_triggered_at    DateTime?       // for 12h cooldown
+  created_at           DateTime        @default(now())
+  resolved_at          DateTime?
+  resolved_by_user_id  String?
+  resolution_note      String?
+  metadata             Json?
+  deleted_at           DateTime?
+
+  clinic      Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient     Patient?     @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+  action_logs AlertActionLog[]
+
+  @@unique([dedup_key])
+  @@index([clinic_id, status, severity])
+  @@index([clinic_id, owner_role_target, status])
+  @@index([clinic_id, patient_id])
+  @@index([clinic_id, created_at])
+  @@map("alerts")
+}
+
+model AlertActionLog {
+  id         String   @id @default(uuid())
+  alert_id   String
+  clinic_id  String
+  user_id    String?
+  action     String
+  note       String?
+  created_at DateTime @default(now())
+
+  alert Alert @relation(fields: [alert_id], references: [id], onDelete: Cascade)
+
+  @@index([alert_id])
+  @@index([clinic_id, created_at])
+  @@map("alert_action_logs")
+}
+
+model AlertRuleConfig {
+  id         String   @id @default(uuid())
+  clinic_id  String
+  rule_key   String
+  enabled    Boolean  @default(true)
+  params     Json     @default("{}")
+  updated_at DateTime @updatedAt
+  created_at DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+
+  @@unique([clinic_id, rule_key])
+  @@index([clinic_id])
+  @@map("alert_rule_configs")
+}
+
+model PatientCognitiveScore {
+  id                       String    @id @default(uuid())
+  clinic_id                String
+  patient_id               String    @unique
+  clinical_stability_score Int       @default(0)
+  retention_risk_score     Int       @default(0)
+  composite_risk_score     Int       @default(0)
+  calculated_at            DateTime  @default(now())
+  explanation_json         Json      @default("{}")
+  score_previous           Int       @default(0)
+  score_trend              String    @default("FLAT")
+  current_band             String    @default("GREEN")
+  consecutive_hits_red     Int       @default(0)
+  consecutive_hits_yellow  Int       @default(0)
+  band_locked_until        DateTime?
+  no_show_probability      Int       @default(0)
+  dropout_risk_30d         Int       @default(0)
+  clinical_trend           String    @default("STABLE")
+
+  clinic  Clinic  @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+
+  @@unique([clinic_id, patient_id])
+  @@index([clinic_id, composite_risk_score])
+  @@map("patient_cognitive_scores")
+}
+
+model PlaybookConfig {
+  id         String   @id @default(uuid())
+  clinic_id  String   @unique
+  enabled    Boolean  @default(true)
+  thresholds Json     @default("{\"red\":70,\"yellow\":40}")
+  actions    Json     @default("{}")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+
+  @@map("playbook_configs")
+}
+
+model Task {
+  id                   String       @id @default(uuid())
+  clinic_id            String
+  patient_id           String?
+  appointment_id       String?
+  source               TaskSource   @default(MANUAL)
+  source_ref_id        String?
+  rule_key             String?
+  type                 TaskType
+  priority             TaskPriority @default(MEDIUM)
+  title                String
+  message              String
+  due_at               DateTime
+  status               TaskStatus   @default(OPEN)
+  owner_role_target    AlertOwnerRole
+  assigned_user_id     String?
+  snoozed_until        DateTime?
+  created_at           DateTime     @default(now())
+  completed_at         DateTime?
+  completed_by_user_id String?
+  resolution_note      String?
+
+  clinic  Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  patient Patient? @relation(fields: [patient_id], references: [id])
+  logs    TaskActionLog[]
+
+  @@index([clinic_id, status, due_at])
+  @@index([clinic_id, priority])
+  @@index([clinic_id, patient_id])
+  @@map("tasks")
+}
+
+model TaskActionLog {
+  id         String         @id @default(uuid())
+  clinic_id  String
+  task_id    String
+  user_id    String
+  action     TaskActionType
+  note       String?
+  created_at DateTime       @default(now())
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@index([clinic_id, task_id])
+  @@map("task_action_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CAMADA FINANCEIRO COMPLETO
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FinancialAccount {
+  id         String               @id @default(uuid())
+  clinic_id  String
+  name       String
+  type       FinancialAccountType @default(CASH)
+  currency   String               @default("BRL")
+  is_active  Boolean              @default(true)
+  created_at DateTime             @default(now())
+  deleted_at DateTime?
+
+  clinic         Clinic         @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  ledger_entries LedgerEntry[]
+  ledger_entries_to LedgerEntry[] @relation("LedgerAccountTo")
+
+  @@index([clinic_id, is_active])
+  @@map("financial_accounts")
+}
+
+model Counterparty {
+  id          String          @id @default(uuid())
+  clinic_id   String
+  type        CounterpartyType @default(OTHER)
+  patient_id  String?
+  name        String
+  document_id String?
+  created_at  DateTime        @default(now())
+  deleted_at  DateTime?
+
+  clinic   Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  payables Payable[]
+
+  @@index([clinic_id, type])
+  @@map("counterparties")
+}
+
+model Receivable {
+  id             String          @id @default(uuid())
+  clinic_id      String
+  patient_id     String
+  appointment_id String?
+  budget_id      String?
+  status         ReceivableStatus @default(OPEN)
+  issue_date     DateTime        @default(now())
+  due_date       DateTime
+  total_amount   Decimal         @db.Decimal(12, 2)
+  paid_amount    Decimal         @default(0) @db.Decimal(12, 2)
+  description    String?
+  payment_terms  Json?
+  notes          String?
+  created_by     String
+  created_at     DateTime        @default(now())
+  updated_at     DateTime        @updatedAt
+  deleted_at     DateTime?
+
+  clinic      Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  patient     Patient      @relation(fields: [patient_id], references: [id], onDelete: Restrict)
+  appointment Appointment? @relation(fields: [appointment_id], references: [id], onDelete: SetNull)
+  ledger_entries LedgerEntry[]
+
+  @@index([clinic_id, status, due_date])
+  @@index([clinic_id, patient_id])
+  @@index([appointment_id])
+  @@map("receivables")
+}
+
+model Payable {
+  id               String          @id @default(uuid())
+  clinic_id        String
+  counterparty_id  String?
+  category         PayableCategory @default(OTHER)
+  status           PayableStatus   @default(OPEN)
+  issue_date       DateTime        @default(now())
+  due_date         DateTime
+  amount           Decimal         @db.Decimal(12, 2)
+  description      String?
+  notes            String?
+  attachment_key   String?
+  created_by       String
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  deleted_at       DateTime?
+
+  clinic       Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  counterparty Counterparty? @relation(fields: [counterparty_id], references: [id], onDelete: SetNull)
+  ledger_entries LedgerEntry[]
+
+  @@index([clinic_id, status, due_date])
+  @@index([clinic_id, category])
+  @@map("payables")
+}
+
+model LedgerEntry {
+  id              String          @id @default(uuid())
+  clinic_id       String
+  type            LedgerEntryType
+  account_id      String?
+  account_to_id   String?
+  reference_type  String?
+  reference_id    String?
+  receivable_id   String?
+  payable_id      String?
+  amount          Decimal         @db.Decimal(12, 2)
+  method          String          @default("OTHER")
+  occurred_at     DateTime        @default(now())
+  description     String?
+  created_by      String
+  created_at      DateTime        @default(now())
+
+  clinic      Clinic            @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  account     FinancialAccount? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+  account_to  FinancialAccount? @relation("LedgerAccountTo", fields: [account_to_id], references: [id], onDelete: SetNull)
+  receivable  Receivable?       @relation(fields: [receivable_id], references: [id], onDelete: SetNull)
+  payable     Payable?          @relation(fields: [payable_id], references: [id], onDelete: SetNull)
+
+  @@index([clinic_id, type, occurred_at])
+  @@index([clinic_id, receivable_id])
+  @@index([clinic_id, payable_id])
+  @@map("ledger_entries")
+}
+
+model FinancialActionLog {
+  id          String   @id @default(uuid())
+  clinic_id   String
+  user_id     String?
+  entity_type String
+  entity_id   String
+  action      String
+  amount      Decimal? @db.Decimal(12, 2)
+  note        String?
+  created_at  DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+
+  @@index([clinic_id, entity_type, entity_id])
+  @@index([clinic_id, created_at])
+  @@map("financial_action_logs")
+}

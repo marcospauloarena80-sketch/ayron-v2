@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s *)",
+      "Bash(curl -s -X *)",
+      "Bash(curl -s -o *)",
+      "Bash(curl -s -w *)",
+      "Bash(mkdir -p *)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc --noEmit *)",
+      "Bash(ls -lh *)",
+      "Bash(ls -la *)",
+      "Bash(ls -t *)",
+      "mcp__ccd_session__mark_chapter",
+      "mcp__ccd_session__spawn_task"
+    ]
+  }
+}

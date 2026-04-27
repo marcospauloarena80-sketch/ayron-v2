@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ayron_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ayron
+      POSTGRES_USER: ayron
+      POSTGRES_PASSWORD: ayron_dev_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ayron -d ayron']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ayron_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes --requirepass ayron_redis_password
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'ayron_redis_password', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: ayron_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ayron_minio
+      MINIO_ROOT_PASSWORD: ayron_minio_password
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+
+networks:
+  default:
+    name: ayron_network

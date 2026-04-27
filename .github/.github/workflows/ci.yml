@@ -1,0 +1,97 @@
+name: AYRON CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ─────────────────────────────────────────────────
+  api:
+    name: API — Typecheck + Lint + Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ayron
+          POSTGRES_PASSWORD: ayron
+          POSTGRES_DB: ayron_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://ayron:ayron@localhost:5432/ayron_test
+      JWT_SECRET: ci-test-secret
+      JWT_EXPIRES_IN: 1d
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install API deps
+        run: cd apps/api && npm ci
+
+      - name: Generate Prisma client
+        run: cd apps/api && npx prisma generate
+
+      - name: Apply migrations
+        run: cd apps/api && npx prisma migrate deploy
+        continue-on-error: true
+
+      - name: Typecheck
+        run: cd apps/api && npx tsc --noEmit
+
+      - name: Lint
+        run: cd apps/api && npm run lint --if-present
+
+      - name: Unit Tests
+        run: cd apps/api && npm run test --if-present -- --passWithNoTests
+
+      - name: Build
+        run: cd apps/api && npm run build
+
+  # ─────────────────────────────────────────────────
+  web:
+    name: Web — Typecheck + Lint + Build
+    runs-on: ubuntu-latest
+
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Web deps
+        run: cd apps/web && npm ci
+
+      - name: Typecheck
+        run: cd apps/web && npx tsc --noEmit
+
+      - name: Lint
+        run: cd apps/web && npm run lint --if-present
+
+      - name: Build
+        run: cd apps/web && npm run build

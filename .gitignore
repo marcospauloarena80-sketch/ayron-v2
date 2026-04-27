@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+.turbo/
+out/
+
+# Environment files — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# Prisma generated
+prisma/migrations/dev/
+*.db
+*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Test / coverage
+coverage/
+.nyc_output/
+junit.xml
+
+# Temp / cache
+.cache/
+tmp/
+.pytest_cache/
+__pycache__/
+
+# Docker volumes (local)
+postgres_data/
+redis_data/
+minio_data/
+
+# Certificates (local dev)
+*.pem
+*.key
+*.crt
+
+# Misc
+-p/
+mkdir/

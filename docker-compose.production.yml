@@ -1,0 +1,210 @@
+# ============================================================
+# AYRON — docker-compose.production.yml
+# VPS-ready: api + web + postgres + redis + minio + nginx + backup
+#
+# Usage (VPS):
+#   cp infra/production/env.production .env.production
+#   # Fill in all secrets (see PRODUCTION.md)
+#   docker compose -f docker-compose.production.yml --env-file .env.production up -d
+# ============================================================
+version: "3.9"
+
+networks:
+  ayron_internal:
+    driver: bridge
+    internal: true          # postgres, redis, minio NOT exposed to host
+  ayron_web:
+    driver: bridge           # nginx ↔ api ↔ web can talk externally
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  # PDF fallback — persists between API restarts
+  ayron_docs:
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # PostgreSQL 16 + pgvector
+  # ──────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ayron_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-ayron}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [ayron_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ayron} -d ${POSTGRES_DB:-ayron_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ──────────────────────────────────────────────────────────
+  # Redis 7
+  # ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    networks: [ayron_internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ──────────────────────────────────────────────────────────
+  # MinIO — object storage for PDFs
+  # ──────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+    volumes:
+      - minio_data:/data
+    networks: [ayron_internal]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ──────────────────────────────────────────────────────────
+  # API — NestJS
+  # ──────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ayron}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ayron_prod}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://yourdomain.com}
+      # MinIO — internal network
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-ayron-docs}
+      MINIO_REGION: us-east-1
+      # Puppeteer — uses system Chromium from Dockerfile
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_ARGS: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--no-zygote,--single-process"
+      PDF_TIMEOUT_MS: ${PDF_TIMEOUT_MS:-30000}
+    volumes:
+      # Persistent PDF fallback — survives API restarts
+      - ayron_docs:/tmp/ayron-docs
+    networks: [ayron_internal, ayron_web]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ──────────────────────────────────────────────────────────
+  # Web — Next.js
+  # ──────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
+        BUILD_STANDALONE: "true"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    networks: [ayron_web]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ──────────────────────────────────────────────────────────
+  # Nginx — reverse proxy + TLS
+  # ──────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+      # Let's Encrypt certs (certbot writes here)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks: [ayron_web]
+
+  # ──────────────────────────────────────────────────────────
+  # Certbot — auto-renew TLS (runs once then sleeps)
+  # ──────────────────────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    restart: "no"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet;
+          sleep 12h & wait $${!};
+        done"
+
+  # ──────────────────────────────────────────────────────────
+  # Backup — daily pg_dump + 7-day retention
+  # ──────────────────────────────────────────────────────────
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-ayron}
+      POSTGRES_DB: ${POSTGRES_DB:-ayron_prod}
+      BACKUP_RETAIN_DAYS: ${BACKUP_RETAIN_DAYS:-7}
+    volumes:
+      - ./infra/backup/backup.sh:/backup.sh:ro
+      - /var/lib/ayron/backups:/backups
+    networks: [ayron_internal]
+    entrypoint: /bin/sh
+    command: ["-c", "chmod +x /backup.sh && crond -f -d 8 & /backup.sh init && while true; do sleep 86400; /backup.sh run; done"]
