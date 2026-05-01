@@ -3,7 +3,19 @@ import { cn } from '@/lib/utils';
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export function Card({ className, ...props }: CardProps) {
-  return <div className={cn('rounded-xl border border-border bg-white p-6 shadow-sm', className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        'rounded-[16px] border border-white/40 p-6',
+        'bg-white/[0.72] backdrop-blur-[16px]',
+        '[box-shadow:var(--glass-shadow)]',
+        'transition-all duration-[220ms] ease',
+        'hover:[box-shadow:var(--glass-shadow-hover)] hover:-translate-y-px',
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 export function CardHeader({ className, ...props }: CardProps) {
@@ -11,9 +23,21 @@ export function CardHeader({ className, ...props }: CardProps) {
 }
 
 export function CardTitle({ className, ...props }: CardProps) {
-  return <h3 className={cn('text-sm font-semibold text-muted-foreground uppercase tracking-wide', className)} {...props} />;
+  return (
+    <h3
+      className={cn('text-sm font-semibold uppercase tracking-wide', className)}
+      style={{ color: 'var(--text-secondary)' }}
+      {...props}
+    />
+  );
 }
 
 export function CardValue({ className, ...props }: CardProps) {
-  return <p className={cn('text-3xl font-bold text-foreground', className)} {...props} />;
+  return (
+    <p
+      className={cn('text-3xl font-bold', className)}
+      style={{ color: 'var(--text-primary)' }}
+      {...props}
+    />
+  );
 }
