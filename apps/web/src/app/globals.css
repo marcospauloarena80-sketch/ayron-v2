@@ -42,9 +42,7 @@
     --transition-fast: 150ms ease;
     --transition-base: 220ms ease;
   }
-}
 
-@layer base {
   * { @apply border-border; }
 
   body {
@@ -52,7 +50,12 @@
     background: linear-gradient(135deg, #F7F9FB 0%, #EEF2F7 100%);
     background-attachment: fixed;
     min-height: 100vh;
-    color: var(--text-primary);
+  }
+
+  @media (max-width: 768px) {
+    body {
+      background-attachment: scroll;
+    }
   }
 
   /* Focus visible global — acessibilidade */
