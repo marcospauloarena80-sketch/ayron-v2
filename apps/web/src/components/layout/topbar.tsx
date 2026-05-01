@@ -94,7 +94,7 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/30">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-white/60">Cancelar</button>
           <button onClick={handleSave} className="px-4 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700">Salvar</button>
         </div>
       </div>
@@ -171,7 +171,7 @@ function PermissionsModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
         <div className="flex justify-end p-5 border-t border-white/30">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Fechar</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-white/60">Fechar</button>
         </div>
       </div>
     </div>
@@ -417,9 +417,9 @@ export function Topbar({ title, subtitle, actions }: { title: string; subtitle?:
         <div className="fixed inset-0 z-[200] flex flex-col" onClick={() => setSearchOpen(false)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div className="relative z-10 mx-auto mt-16 w-full max-w-xl px-4" onClick={e => e.stopPropagation()}>
-            <div className="rounded-2xl border border-border bg-white shadow-2xl overflow-hidden">
+            <div className="rounded-2xl border border-white/40 [background:var(--glass-bg-strong)] [backdrop-filter:blur(20px)] [-webkit-backdrop-filter:blur(20px)] [box-shadow:0_24px_64px_rgba(0,0,0,0.15)] overflow-hidden">
               {/* Search input */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-white/20">
                 <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <input
                   ref={searchInputRef}
@@ -448,7 +448,7 @@ export function Topbar({ title, subtitle, actions }: { title: string; subtitle?:
                     <button
                       key={href}
                       onClick={() => { router.push(href); setSearchOpen(false); }}
-                      className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-left"
+                      className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-white/60 hover:text-foreground transition-colors text-left"
                     >
                       <Icon className="h-4 w-4 flex-shrink-0" />
                       {label}
@@ -466,7 +466,7 @@ export function Topbar({ title, subtitle, actions }: { title: string; subtitle?:
                     <button
                       key={r.id}
                       onClick={() => { router.push(r.href); setSearchOpen(false); }}
-                      className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                      className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-white/60 transition-colors text-left"
                     >
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">
                         {r.label?.[0]}
@@ -490,7 +490,7 @@ export function Topbar({ title, subtitle, actions }: { title: string; subtitle?:
                 </div>
               )}
 
-              <div className="border-t border-border px-4 py-2 flex items-center gap-4 text-[10px] text-muted-foreground">
+              <div className="border-t border-white/20 px-4 py-2 flex items-center gap-4 text-[10px] text-muted-foreground">
                 <span><kbd className="rounded border border-border px-1">↵</kbd> abrir</span>
                 <span><kbd className="rounded border border-border px-1">Esc</kbd> fechar</span>
                 <span><kbd className="rounded border border-border px-1">⌘K</kbd> alternar</span>
@@ -507,7 +507,7 @@ export function Topbar({ title, subtitle, actions }: { title: string; subtitle?:
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-foreground">Trocar Senha</h2>
               <button onClick={() => { setShowPasswordModal(false); setPwForm({ current: '', next: '', confirm: '' }); }}
-                className="rounded-lg p-1 hover:bg-muted transition-colors">
+                className="rounded-lg p-1 hover:bg-white/60 transition-colors">
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
@@ -548,7 +548,7 @@ export function Topbar({ title, subtitle, actions }: { title: string; subtitle?:
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => { setShowPasswordModal(false); setPwForm({ current: '', next: '', confirm: '' }); }}
-                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors">
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-white/60 transition-colors">
                 Cancelar
               </button>
               <button onClick={handleChangePassword} disabled={pwLoading}
