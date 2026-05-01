@@ -143,7 +143,7 @@ export function Sidebar() {
           <div
             title={collapsed ? 'Configurações' : undefined}
             className={cn(
-              'flex items-center rounded-lg py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted cursor-pointer transition-colors',
+              'flex items-center rounded-lg py-2.5 text-sm font-medium text-muted-foreground hover:bg-white/60 hover:text-foreground cursor-pointer transition-all duration-[150ms]',
               collapsed ? 'justify-center px-0' : 'gap-3 px-3'
             )}
           >
@@ -166,7 +166,7 @@ export function Sidebar() {
           onClick={() => setCollapsed(v => !v)}
           title={collapsed ? 'Expandir sidebar' : 'Minimizar sidebar'}
           className={cn(
-            'w-full flex items-center rounded-lg py-2 text-xs text-muted-foreground hover:bg-muted transition-colors',
+            'w-full flex items-center rounded-lg py-2 text-xs text-muted-foreground hover:bg-white/60 hover:text-foreground transition-all duration-[150ms]',
             collapsed ? 'justify-center px-0' : 'gap-2 px-3'
           )}
         >
