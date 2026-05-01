@@ -83,11 +83,13 @@ export function Sidebar() {
 
   return (
     <aside className={cn(
-      'flex h-screen flex-col border-r border-border bg-white transition-all duration-200',
+      'flex h-screen flex-col border-r border-white/30 transition-all duration-200 z-20',
+      '[background:var(--glass-bg-strong)] [backdrop-filter:blur(20px)] [-webkit-backdrop-filter:blur(20px)]',
+      '[box-shadow:2px_0_16px_rgba(0,0,0,0.06)]',
       collapsed ? 'w-16' : 'w-64'
     )}>
-      <div className={cn('flex h-16 items-center border-b', collapsed ? 'justify-center px-0' : 'gap-2 px-6')}>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary flex-shrink-0">
+      <div className={cn('flex h-16 items-center border-b border-white/30', collapsed ? 'justify-center px-0' : 'gap-2 px-6')}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary flex-shrink-0 [box-shadow:0_2px_8px_rgba(255,106,0,0.35)]">
           <Brain className="h-4 w-4 text-white" />
         </div>
         {!collapsed && <span className="text-lg font-bold tracking-tight text-secondary">AYRON</span>}
@@ -106,8 +108,16 @@ export function Sidebar() {
                   'relative flex items-center rounded-lg py-2.5 text-sm font-medium transition-colors mb-0.5',
                   collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                   active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ? [
+                        'text-primary font-medium',
+                        'bg-gradient-to-r from-primary/20 to-primary/5',
+                        '[box-shadow:inset_0_0_0_1px_rgba(255,106,0,0.20),0_2px_8px_rgba(255,106,0,0.15)]',
+                      ].join(' ')
+                    : [
+                        'text-muted-foreground',
+                        'hover:bg-white/60 hover:text-foreground',
+                        'hover:[box-shadow:var(--shadow-soft)]',
+                      ].join(' '),
                 )}
               >
                 <Icon className="h-4 w-4 flex-shrink-0" />
@@ -128,7 +138,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t p-3 space-y-1">
+      <div className="border-t border-white/30 p-3 space-y-1">
         <Link href="/settings">
           <div
             title={collapsed ? 'Configurações' : undefined}
@@ -145,7 +155,7 @@ export function Sidebar() {
           onClick={handleLogout}
           title={collapsed ? 'Sair' : undefined}
           className={cn(
-            'w-full flex items-center rounded-lg py-2.5 text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors',
+            'w-full flex items-center rounded-lg py-2.5 text-sm font-medium text-muted-foreground hover:bg-red-50/70 hover:text-red-600 transition-colors',
             collapsed ? 'justify-center px-0' : 'gap-3 px-3'
           )}
         >
