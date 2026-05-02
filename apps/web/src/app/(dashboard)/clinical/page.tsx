@@ -923,7 +923,7 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                   </div>
                 </div>
                 <div className="space-y-2">
-                  {r.items.map((item, i) => (
+                  {r.items.map((item: any, i: number) => (
                     <div key={`${r.id}-item-${i}`} className="p-3 rounded-lg bg-muted/50">
                       <p className="text-sm font-semibold">{item.med}</p>
                       <p className="text-xs text-muted-foreground">{item.dosagem} · {item.qtd}</p>
