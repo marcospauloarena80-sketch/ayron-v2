@@ -14,6 +14,7 @@ import { AdvancedFilter } from '@/components/ui/advanced-filter';
 import { ConfirmActionModal } from '@/components/ui/confirm-action-modal';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
+import { fetchFinancialTransactions } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import {
@@ -876,10 +877,20 @@ function LancamentosTab() {
   const [showDefinirPago, setShowDefinirPago] = useState(false);
   const ofxRef = useRef<HTMLInputElement>(null);
 
-  const filtered = MOCK_LANCAMENTOS.filter(l => {
+  const { data: lancamentosDB = MOCK_LANCAMENTOS } = useQuery({
+    queryKey: ['financial-transactions', from, to, tipoFilter],
+    queryFn: () => fetchFinancialTransactions({
+      from: from || undefined,
+      to: to || undefined,
+      tipo: tipoFilter || undefined,
+    }).catch(() => MOCK_LANCAMENTOS),
+    staleTime: 30_000,
+  });
+
+  const filtered = lancamentosDB.filter((l: any) => {
     if (tipoFilter && l.tipo !== tipoFilter) return false;
-    if (conta && !l.conta.toLowerCase().includes(conta.toLowerCase())) return false;
-    if (search && !l.descricao.toLowerCase().includes(search.toLowerCase()) && !l.controle.includes(search) && !String(l.valor).includes(search)) return false;
+    if (conta && l.conta && !l.conta.toLowerCase().includes(conta.toLowerCase())) return false;
+    if (search && !l.descricao.toLowerCase().includes(search.toLowerCase()) && !(l.controle ?? '').includes(search) && !String(l.valor).includes(search)) return false;
     if (from && l.vencimento < from) return false;
     if (to && l.vencimento > to) return false;
     return true;

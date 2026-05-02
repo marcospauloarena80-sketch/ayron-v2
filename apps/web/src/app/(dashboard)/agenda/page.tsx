@@ -14,6 +14,7 @@ import { KanbanView } from '@/components/agenda/kanban-view';
 import { FinalizeModal } from '@/components/agenda/finalize-modal';
 import { ChevronLeft, ChevronRight, Plus, UserCheck, LogOut, Calendar, Filter, FileText, Grid, List, DollarSign, Columns, CheckSquare, Users, Timer, ChevronDown, X, Search, Printer, MessageCircle, LayoutGrid, MoreHorizontal } from 'lucide-react';
 import api from '@/lib/api';
+import { fetchProfessionals } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -535,6 +536,17 @@ export default function AgendaPage() {
   const qc = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Profissionais do Supabase
+  const { data: profissionaisDB = [] } = useQuery({
+    queryKey: ['professionals'],
+    queryFn: () => fetchProfessionals().catch(() => []),
+    staleTime: 300_000,
+  });
+  const PROFESSIONALS_LIST = [
+    { id: 'all', label: 'Todos', color: '#1B3A4B' },
+    ...profissionaisDB.map((p: any) => ({ id: p.id, label: p.name, color: p.color ?? '#6366f1' })),
+  ];
   const patientIdFromUrl = searchParams.get('patientId');
   const patientNameFromUrl = searchParams.get('patientName');
 
@@ -613,7 +625,7 @@ export default function AgendaPage() {
     return list.filter((a: any) =>
       a.professional_id === selectedProfessional ||
       (a.professional?.name ?? '').toLowerCase().includes(
-        (MOCK_PROFESSIONALS.find((p: any) => p.id === selectedProfessional)?.label ?? '').toLowerCase()
+        (PROFESSIONALS_LIST.find((p: any) => p.id === selectedProfessional)?.label ?? '').toLowerCase()
       )
     );
   }, [appointments, selectedProfessional]);
@@ -766,7 +778,7 @@ export default function AgendaPage() {
 
         {/* Professional tabs */}
         <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
-          {MOCK_PROFESSIONALS.map(prof => (
+          {PROFESSIONALS_LIST.map(prof => (
             <button
               key={prof.id}
               onClick={() => setSelectedProfessional(prof.id)}

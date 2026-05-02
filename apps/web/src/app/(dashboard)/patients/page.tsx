@@ -18,6 +18,7 @@ import { getPatientPendingFlags } from '@/lib/patient-pending-flags';
 import { birthdayExportService, type PatientBirthdayRow } from '@/lib/birthday-export-service';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
+import { fetchPatients, fetchAllPatients } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 
 // ── Mock patient data (fallback when API offline) ─────────────────────────────
@@ -820,12 +821,19 @@ export default function PatientsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['patients', search, page],
     queryFn: () =>
-      api.get('/patients', { params: { search: search || undefined, page, limit: PAGE_SIZE } })
-        .then(r => r.data)
+      fetchPatients({ search: search || undefined, page, limit: PAGE_SIZE })
         .catch(() => ({ data: MOCK_PATIENTS_LIST, total: MOCK_PATIENTS_LIST.length, totalPages: 1 })),
     placeholderData: (prev) => prev,
     staleTime: 30_000,
   });
+
+  // Stats query — busca todos os pacientes para contadores dos quick filters
+  const { data: allPatientsData } = useQuery({
+    queryKey: ['patients-all-stats'],
+    queryFn: () => fetchAllPatients().catch(() => MOCK_PATIENTS_LIST),
+    staleTime: 60_000,
+  });
+  const allPatients: any[] = allPatientsData ?? MOCK_PATIENTS_LIST;
 
   const apiPatients: any[] = data?.data ?? MOCK_PATIENTS_LIST;
   const total: number = data?.total ?? MOCK_PATIENTS_LIST.length;
@@ -860,8 +868,8 @@ export default function PatientsPage() {
   });
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
-  const aniversariantesCount = MOCK_PATIENTS_LIST.filter(p => p.birth_date && new Date(p.birth_date).getMonth() + 1 === currentMonth).length;
-  const inativoCount = MOCK_PATIENTS_LIST.filter(p => p.current_status === 'INATIVO').length;
+  const aniversariantesCount = allPatients.filter(p => p.birth_date && new Date(p.birth_date).getMonth() + 1 === currentMonth).length;
+  const inativoCount = allPatients.filter(p => p.current_status === 'INATIVO').length;
 
   return (
     <div>
@@ -901,12 +909,12 @@ export default function PatientsPage() {
         {/* Quick filters */}
         <div className="flex gap-2 flex-wrap">
           {[
-            { key: '', label: 'Todos', count: MOCK_PATIENTS_LIST.length },
-            { key: 'VIP', label: '💎 VIP+', count: MOCK_PATIENTS_LIST.filter(p => ['DIAMANTE','PLATINA','VIP'].includes(p.tier)).length },
-            { key: 'EM_RISCO', label: '⚠️ Em Risco', count: MOCK_PATIENTS_LIST.filter(p => p.days_absent >= 60 && p.current_status !== 'INATIVO').length },
+            { key: '', label: 'Todos', count: total },
+            { key: 'VIP', label: '💎 VIP+', count: allPatients.filter(p => ['DIAMANTE','PLATINA','VIP'].includes(p.tier)).length },
+            { key: 'EM_RISCO', label: '⚠️ Em Risco', count: allPatients.filter(p => (p.days_absent ?? 0) >= 60 && p.current_status !== 'INATIVO').length },
             { key: 'INATIVO', label: '🔴 Inativos', count: inativoCount },
             { key: 'ANIVERSARIO', label: `🎂 Aniversário`, count: aniversariantesCount },
-            { key: 'MALA_DIRETA', label: '📨 Mala Direta', count: MOCK_PATIENTS_LIST.filter(p => p.mala_direta).length },
+            { key: 'MALA_DIRETA', label: '📨 Mala Direta', count: allPatients.filter(p => p.mala_direta).length },
           ].map(({ key, label, count }) => (
             <button
               key={key}

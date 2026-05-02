@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
+import { fetchProtocols } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import {
   Repeat2, Check, Clock, AlertTriangle, Search, Plus, ChevronRight,
@@ -233,7 +234,15 @@ export default function SessionsPage() {
   const [checkIn, setCheckIn] = useState<Protocol | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const filtered = MOCK_PROTOCOLS.filter(p => {
+  const { data: protocolsData = MOCK_PROTOCOLS, isLoading: loadingProtocols } = useQuery({
+    queryKey: ['protocols'],
+    queryFn: () => fetchProtocols().catch(() => MOCK_PROTOCOLS),
+    staleTime: 30_000,
+  });
+
+  const protocols: Protocol[] = protocolsData as Protocol[];
+
+  const filtered = protocols.filter(p => {
     const matchSearch = search === '' || p.patient_name.toLowerCase().includes(search.toLowerCase()) || p.protocol_name.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || p.status === statusFilter;
     const matchCat = categoryFilter === 'all' || p.category === categoryFilter;
@@ -250,13 +259,13 @@ export default function SessionsPage() {
   });
 
   // KPIs
-  const ativos = MOCK_PROTOCOLS.filter(p => p.status === 'ATIVO').length;
-  const atrasados = MOCK_PROTOCOLS.filter(p => p.status === 'ATRASADO').length;
-  const concluidos = MOCK_PROTOCOLS.filter(p => p.status === 'CONCLUIDO').length;
-  const hojeCount = MOCK_PROTOCOLS.filter(p => daysUntil(p.next_session_date) === 0).length;
-  const semanaCount = MOCK_PROTOCOLS.filter(p => { const d = daysUntil(p.next_session_date); return d !== null && d >= 0 && d <= 7; }).length;
+  const ativos = protocols.filter(p => p.status === 'ATIVO').length;
+  const atrasados = protocols.filter(p => p.status === 'ATRASADO').length;
+  const concluidos = protocols.filter(p => p.status === 'CONCLUIDO').length;
+  const hojeCount = protocols.filter(p => daysUntil(p.next_session_date) === 0).length;
+  const semanaCount = protocols.filter(p => { const d = daysUntil(p.next_session_date); return d !== null && d >= 0 && d <= 7; }).length;
 
-  const categories = [...new Set(MOCK_PROTOCOLS.map(p => p.category))];
+  const categories = [...new Set(protocols.map(p => p.category))];
 
   return (
     <div>
