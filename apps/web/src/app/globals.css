@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    /* Tokens existentes — mantidos */
     --background: 0 0% 100%;
     --foreground: 210 20% 15%;
     --primary: 24 100% 50%;        /* #FF6B00 — laranja AYRON */
@@ -15,10 +16,116 @@
     --border: 220 13% 91%;
     --ring: 24 100% 50%;
     --radius: 0.5rem;
+
+    /* Glass surfaces */
+    --glass-bg: rgba(255, 255, 255, 0.72);
+    --glass-bg-strong: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.40);
+
+    /* Sombras padronizadas */
+    --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.06);
+    --shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.10);
+    --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+    --glass-shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+    /* Gradiente e glow primário */
+    --primary-gradient: linear-gradient(135deg, #FF6A00 0%, #FF3B00 100%);
+    --primary-glow: 0 0 16px rgba(255, 106, 0, 0.25);
+
+    /* Tipografia com contraste garantido */
+    --text-primary: rgba(15, 23, 42, 0.90);
+    --text-secondary: rgba(15, 23, 42, 0.60);
+
+    /* Raios e transições */
+    --radius-card: 16px;
+    --radius-btn: 10px;
+    --transition-fast: 150ms ease;
+    --transition-base: 220ms ease;
+  }
+
+  * { @apply border-border; }
+
+  body {
+    @apply text-foreground antialiased;
+    background: linear-gradient(135deg, #F7F9FB 0%, #EEF2F7 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  @media (max-width: 768px) {
+    body {
+      background-attachment: scroll;
+    }
+  }
+
+  /* Focus visible global — acessibilidade */
+  :focus-visible {
+    outline: 2px solid #FF6A00;
+    outline-offset: 2px;
+  }
+
+  /* Reset outline para elementos com ring Tailwind customizado */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  button:focus-visible {
+    outline: none;
   }
 }
 
-@layer base {
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground antialiased; }
+/* ── Classes Glass Utilitárias ──────────────────────────────────────────── */
+
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--radius-card);
+  }
+
+  .glass-strong {
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .glass-card {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--radius-card);
+    transition: box-shadow var(--transition-base), transform var(--transition-base);
+  }
+
+  .glass-card:hover {
+    box-shadow: var(--glass-shadow-hover);
+    transform: translateY(-1px);
+  }
+
+  .glass-modal {
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15), 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* ── Fallback: ambientes sem backdrop-filter ────────────────────────────── */
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass,
+  .glass-strong,
+  .glass-card,
+  .glass-modal {
+    background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
