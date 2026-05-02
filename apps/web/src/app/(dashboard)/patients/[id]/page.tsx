@@ -2,12 +2,13 @@
 import React, { useState } from 'react';
 
 function useLocalStorage<T>(key: string, initial: T) {
-  const [value, setValue] = React.useState<T>(() => {
+  const [value, setValue] = React.useState<T>(initial);
+  React.useEffect(() => {
     try {
       const stored = localStorage.getItem(key);
-      return stored ? (JSON.parse(stored) as T) : initial;
-    } catch { return initial; }
-  });
+      if (stored !== null) setValue(JSON.parse(stored) as T);
+    } catch {}
+  }, [key]);
   const set = (v: T | ((prev: T) => T)) => {
     setValue(prev => {
       const next = typeof v === 'function' ? (v as (p: T) => T)(prev) : v;
