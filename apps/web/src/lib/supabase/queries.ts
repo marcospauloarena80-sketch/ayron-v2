@@ -386,6 +386,82 @@ export async function updatePatient(patientId: string, payload: any): Promise<an
   return data;
 }
 
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+export async function fetchDashboardOverview(): Promise<any> {
+  const supabase = createClient();
+  const today = new Date().toISOString().split('T')[0];
+  const monthStart = today.slice(0, 7) + '-01';
+
+  // Today's appointments
+  const { data: todayAppts } = await supabase
+    .from('appointments')
+    .select('id, status, patients(full_name, tier), professionals(name), start_time, type, procedure_name')
+    .gte('start_time', `${today}T00:00:00`)
+    .lte('start_time', `${today}T23:59:59`);
+
+  const total = todayAppts?.length ?? 0;
+  const completed = todayAppts?.filter((a: any) => a.status === 'COMPLETED').length ?? 0;
+  const checked_in = todayAppts?.filter((a: any) => ['CHECKED_IN', 'IN_PROGRESS'].includes(a.status)).length ?? 0;
+
+  // Active patients
+  const { count: activeCount } = await supabase
+    .from('patients')
+    .select('*', { count: 'exact', head: true })
+    .neq('current_status', 'INATIVO');
+
+  // New patients this month
+  const { count: newCount } = await supabase
+    .from('patients')
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', monthStart);
+
+  // Monthly revenue
+  const { data: revData } = await supabase
+    .from('financial_transactions')
+    .select('pago')
+    .eq('tipo', 'RECEBER')
+    .in('status', ['PAGO', 'PARCIAL'])
+    .gte('pago_em', monthStart);
+  const monthly_revenue = revData?.reduce((s: number, t: any) => s + Number(t.pago ?? 0), 0) ?? 0;
+
+  // Pending transactions
+  const { count: pendingCount } = await supabase
+    .from('financial_transactions')
+    .select('*', { count: 'exact', head: true })
+    .in('status', ['ABERTO', 'PARCIAL'])
+    .eq('tipo', 'RECEBER');
+
+  // Open alerts
+  const { count: alertsCount } = await supabase
+    .from('alerts')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'OPEN');
+
+  // Recent completed appointments
+  const recent = (todayAppts ?? [])
+    .filter((a: any) => a.status === 'COMPLETED')
+    .slice(0, 5)
+    .map((a: any) => ({
+      id: a.id,
+      patient_name: a.patients?.full_name ?? 'Paciente',
+      tier: a.patients?.tier ?? 'SILVER',
+      professional: a.professionals?.name ?? '—',
+      type: a.type ?? 'CONSULTATION',
+      start_time: a.start_time,
+    }));
+
+  const occupation_rate = total > 0 ? Math.round((checked_in + completed) / total * 100) : 0;
+
+  return {
+    today: { total, completed, checked_in, occupation_rate },
+    patients: { active: activeCount ?? 0, new_this_month: newCount ?? 0 },
+    financial: { monthly_revenue, pending_count: pendingCount ?? 0 },
+    alerts: { pending_decisions: alertsCount ?? 0, low_stock: 0 },
+    recent_appointments: recent,
+  };
+}
+
 // ── Patient Detail ────────────────────────────────────────────────────────────
 
 export async function fetchPatientById(patientId: string): Promise<any> {

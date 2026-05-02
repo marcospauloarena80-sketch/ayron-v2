@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '@/lib/api';
+import { fetchDashboardOverview } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -829,7 +830,7 @@ function WelcomeModal() {
 export default function DashboardPage() {
   const { data: overview, isLoading } = useQuery({
     queryKey: ['dashboard-overview'],
-    queryFn: () => api.get('/dashboard').then(r => r.data),
+    queryFn: () => fetchDashboardOverview().catch(() => null),
     refetchInterval: 30_000,
   });
 
