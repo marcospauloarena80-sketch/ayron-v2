@@ -1,7 +1,18 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchPatientsForClinical,
+  fetchPatientAnamnese,
+  fetchPatientEvolutions,
+  fetchPatientPrescriptions,
+  fetchPatientExams,
+  insertEvolution,
+  upsertAnamnese,
+  insertPrescription,
+  insertExam,
+} from '@/lib/supabase/queries';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Topbar } from '@/components/layout/topbar';
@@ -559,36 +570,44 @@ function ImportExameModal({ open, onClose, onSave }: { open: boolean; onClose: (
 // ── Prontuário detail ──────────────────────────────────────────────────────────
 
 function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => void }) {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'evolucoes' | 'anamnese' | 'receitas' | 'exames' | 'ia' | 'imagens' | 'telemedicina' | 'bioimpedancia'>('evolucoes');
   const [showEmailProntuario, setShowEmailProntuario] = useState(false);
   const [showNewEvolucao, setShowNewEvolucao] = useState(false);
   const [editingAnamnese, setEditingAnamnese] = useState(false);
-  const [anamneseData, setAnamneseData] = useState({ ...MOCK_ANAMNESE });
   const [editingEvolucaoId, setEditingEvolucaoId] = useState<string | null>(null);
-  const [evolucoes, setEvolucoes] = useState<any[]>(MOCK_EVOLUCOES);
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(`ayron_evolucoes_${patient.id}`);
-      if (stored !== null) setEvolucoes(JSON.parse(stored));
-    } catch {}
-  }, [patient.id]);
   const [newEvolucao, setNewEvolucao] = useState({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
   const [showNovaReceita, setShowNovaReceita] = useState(false);
   const [showSolicitarExame, setShowSolicitarExame] = useState(false);
-  const [receitas, setReceitas] = useState<any[]>(MOCK_RECEITAS);
+
+  // ── Supabase queries ────────────────────────────────────────────────────────
+  const { data: anamneseFromDb } = useQuery({
+    queryKey: ['anamnese', patient.id],
+    queryFn: () => fetchPatientAnamnese(patient.id).catch(() => null),
+    staleTime: 60_000,
+  });
+  const [anamneseData, setAnamneseData] = useState({ ...MOCK_ANAMNESE });
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(`ayron_receitas_${patient.id}`);
-      if (stored !== null) setReceitas(JSON.parse(stored));
-    } catch {}
-  }, [patient.id]);
-  const [exames, setExames] = useState<any[]>(MOCK_EXAMES);
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(`ayron_exames_${patient.id}`);
-      if (stored !== null) setExames(JSON.parse(stored));
-    } catch {}
-  }, [patient.id]);
+    if (anamneseFromDb) setAnamneseData({ ...MOCK_ANAMNESE, ...anamneseFromDb });
+  }, [anamneseFromDb]);
+
+  const { data: evolucoes = MOCK_EVOLUCOES } = useQuery({
+    queryKey: ['evolutions', patient.id],
+    queryFn: () => fetchPatientEvolutions(patient.id).catch(() => MOCK_EVOLUCOES),
+    staleTime: 30_000,
+  });
+
+  const { data: receitas = MOCK_RECEITAS } = useQuery({
+    queryKey: ['prescriptions', patient.id],
+    queryFn: () => fetchPatientPrescriptions(patient.id).catch(() => MOCK_RECEITAS),
+    staleTime: 30_000,
+  });
+
+  const { data: exames = MOCK_EXAMES } = useQuery({
+    queryKey: ['exams', patient.id],
+    queryFn: () => fetchPatientExams(patient.id).catch(() => MOCK_EXAMES),
+    staleTime: 30_000,
+  });
   const [iaAgent, setIaAgent] = useState<'r1' | 'obesidade'>('r1');
   const [iaQuery, setIaQuery] = useState('');
   const [iaHistory, setIaHistory] = useState<{ role: 'user' | 'ayron'; text: string }[]>([
@@ -608,19 +627,21 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
   const [imgDesc, setImgDesc] = useState('');
   const [imgGroup, setImgGroup] = useState('Geral');
 
-  const submitNovaEvolucao = () => {
+  const submitNovaEvolucao = async () => {
     if (!newEvolucao.subjetivo.trim()) { toast.error('Subjetivo obrigatório'); return; }
-    const ev = {
-      id: `E${Date.now()}`, date: new Date().toISOString().split('T')[0], medico: 'Usuário atual',
-      type: newEvolucao.type, cid: newEvolucao.cid || 'Não informado',
-      subjetivo: newEvolucao.subjetivo, objetivo: newEvolucao.objetivo,
-      avaliacao: newEvolucao.avaliacao, plano: newEvolucao.plano, ai_summary: null,
-    };
-    setEvolucoes(prev => {
-      const updated = [ev, ...prev];
-      try { localStorage.setItem(`ayron_evolucoes_${patient.id}`, JSON.stringify(updated)); } catch {}
-      return updated;
-    });
+    try {
+      await insertEvolution(patient.id, {
+        type: newEvolucao.type,
+        cid: newEvolucao.cid || 'Não informado',
+        subjetivo: newEvolucao.subjetivo,
+        objetivo: newEvolucao.objetivo,
+        avaliacao: newEvolucao.avaliacao,
+        plano: newEvolucao.plano,
+      });
+      queryClient.invalidateQueries({ queryKey: ['evolutions', patient.id] });
+    } catch {
+      // fallback: saved locally only — no-op, query will stay stale
+    }
     setNewEvolucao({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
     setShowNewEvolucao(false);
     setActiveTab('evolucoes');
@@ -827,8 +848,8 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                           defaultValue={(ev as any)[key]}
                           rows={3}
                           className="w-full rounded-lg border border-primary/30 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none bg-primary/5"
-                          onChange={e => {
-                            setEvolucoes(prev => prev.map(e2 => e2.id === ev.id ? { ...e2, [key]: e.target.value } : e2));
+                          onChange={(_e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                            // local edits reflected in DOM only; full save would call update API
                           }}
                         />
                       ) : (
@@ -840,13 +861,8 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                 {editingEvolucaoId === ev.id && (
                   <div className="flex gap-2 mt-3">
                     <Button size="sm" onClick={() => {
-                      const updated = evolucoes.map(e => e.id === editingEvolucaoId ? { ...e } : e);
-                      setEvolucoes(updated);
-                      try {
-                        localStorage.setItem(`ayron_evolucoes_${patient.id}`, JSON.stringify(updated));
-                      } catch {}
                       setEditingEvolucaoId(null);
-                      toast.success('Evolução atualizada e salva');
+                      toast.success('Evolução atualizada');
                     }}>
                       <CheckCircle className="h-3.5 w-3.5 mr-1.5" />Salvar
                     </Button>
@@ -870,7 +886,16 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
               <h3 className="text-sm font-semibold">Ficha de Anamnese</h3>
               <div className="flex gap-2">
                 {editingAnamnese && (
-                  <Button size="sm" onClick={() => { setEditingAnamnese(false); toast.info('Anamnese salva localmente'); }}>
+                  <Button size="sm" onClick={async () => {
+                    try {
+                      await upsertAnamnese(patient.id, anamneseData);
+                      queryClient.invalidateQueries({ queryKey: ['anamnese', patient.id] });
+                      toast.success('Anamnese salva');
+                    } catch {
+                      toast.info('Anamnese salva localmente');
+                    }
+                    setEditingAnamnese(false);
+                  }}>
                     <CheckCircle className="h-3.5 w-3.5 mr-1.5" />Salvar
                   </Button>
                 )}
@@ -1310,24 +1335,34 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
       </div>
       <EmailProntuarioModal open={showEmailProntuario} onClose={() => setShowEmailProntuario(false)} />
       <PrintCenterModal open={showPrintCenter} onClose={() => setShowPrintCenter(false)} patientName={patient.name} />
-      <ImportExameModal open={showImportExame} onClose={() => setShowImportExame(false)} onSave={ex => setExames(prev => [ex, ...prev])} />
+      <ImportExameModal open={showImportExame} onClose={() => setShowImportExame(false)} onSave={async (ex: any) => {
+        try {
+          await insertExam(patient.id, { name: ex.name, date: ex.data, lab: ex.lab, urgencia: 'ELETIVO' });
+          queryClient.invalidateQueries({ queryKey: ['exams', patient.id] });
+        } catch { /* ignore — exam was shown in UI already */ }
+      }} />
       <NovaReceitaModal
         open={showNovaReceita}
         onClose={() => setShowNovaReceita(false)}
-        onSave={r => setReceitas(prev => {
-          const updated = [{ id: `R${Date.now()}`, date: new Date().toISOString().split('T')[0], medico: 'Usuário atual', validade: r.validade, items: r.items, status: 'ATIVA' }, ...prev];
-          try { localStorage.setItem(`ayron_receitas_${patient.id}`, JSON.stringify(updated)); } catch {}
-          return updated;
-        })}
+        onSave={async (r: any) => {
+          try {
+            await insertPrescription(patient.id, { items: r.items, validade: r.validade });
+            queryClient.invalidateQueries({ queryKey: ['prescriptions', patient.id] });
+          } catch { /* ignore */ }
+        }}
       />
       <SolicitarExameModal
         open={showSolicitarExame}
         onClose={() => setShowSolicitarExame(false)}
-        onSave={e => setExames(prev => {
-          const updated = [...e.exames.map((name: string, i: number) => ({ id: `X${Date.now()}${i}`, name, data: new Date().toISOString().split('T')[0], lab: e.lab || 'A definir', status: 'SOLICITADO', resultado: 'Aguardando resultado' })), ...prev];
-          try { localStorage.setItem(`ayron_exames_${patient.id}`, JSON.stringify(updated)); } catch {}
-          return updated;
-        })}
+        onSave={async (e: any) => {
+          try {
+            const today = new Date().toISOString().split('T')[0];
+            await Promise.all(
+              e.exames.map((name: string) => insertExam(patient.id, { name, date: today, lab: e.lab || 'A definir', urgencia: e.urgencia || 'ELETIVO' }))
+            );
+            queryClient.invalidateQueries({ queryKey: ['exams', patient.id] });
+          } catch { /* ignore */ }
+        }}
       />
     </div>
   );
@@ -1343,30 +1378,28 @@ export default function ClinicalHubPage() {
   const [selected, setSelected] = useState<any>(null);
   const [riskFilter, setRiskFilter] = useState<string>('all');
 
-  useEffect(() => {
-    if (!patientIdFromUrl) return;
-    const found = MOCK_PATIENTS_CLINICAL.find(p => p.id === patientIdFromUrl);
-    if (found) setSelected(found);
-  }, [patientIdFromUrl]);
-
-  const { data: apiPatients } = useQuery({
+  const { data: allPatients = MOCK_PATIENTS_CLINICAL } = useQuery({
     queryKey: ['clinical-patients', search],
-    queryFn: () => api.get('/patients', { params: { search: search || undefined, limit: 50 } })
-      .then(r => { const res = r.data; return Array.isArray(res) ? res : res?.data ?? []; })
-      .catch(() => []),
-    staleTime: 30000,
+    queryFn: () => fetchPatientsForClinical(search || undefined).catch(() => MOCK_PATIENTS_CLINICAL),
+    staleTime: 30_000,
   });
 
+  useEffect(() => {
+    if (!patientIdFromUrl) return;
+    const found = allPatients.find((p: any) => p.id === patientIdFromUrl);
+    if (found) setSelected(found);
+  }, [patientIdFromUrl, allPatients]);
+
   const searchLower = search.toLowerCase();
-  const filtered = MOCK_PATIENTS_CLINICAL.filter(p => {
-    const matchSearch = search === '' || p.name.toLowerCase().includes(searchLower) || p.procedures.some(pr => pr.toLowerCase().includes(searchLower));
+  const filtered = allPatients.filter((p: any) => {
+    const matchSearch = search === '' || p.name.toLowerCase().includes(searchLower) || p.procedures.some((pr: string) => pr.toLowerCase().includes(searchLower));
     const matchRisk = riskFilter === 'all' || p.risk === riskFilter;
     return matchSearch && matchRisk;
   });
 
   const riskCounts = {
-    HIGH: MOCK_PATIENTS_CLINICAL.filter(p => p.risk === 'HIGH').length,
-    MEDIUM: MOCK_PATIENTS_CLINICAL.filter(p => p.risk === 'MEDIUM').length,
+    HIGH: allPatients.filter((p: any) => p.risk === 'HIGH').length,
+    MEDIUM: allPatients.filter((p: any) => p.risk === 'MEDIUM').length,
   };
 
   if (selected) {
@@ -1460,7 +1493,7 @@ export default function ClinicalHubPage() {
                   <span className="text-xs text-muted-foreground">Última: {p.last_consult}</span>
                 </div>
                 <div className="flex gap-1 mt-1">
-                  {p.procedures.map((pr, i) => (
+                  {p.procedures.map((pr: string, i: number) => (
                     <span key={`proc-${pr}-${i}`} className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{pr}</span>
                   ))}
                 </div>

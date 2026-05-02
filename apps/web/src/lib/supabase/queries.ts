@@ -134,6 +134,186 @@ export async function fetchFinancialTransactions({
 
 // ── Appointments ──────────────────────────────────────────────────────────────
 
+// ── Clinical Hub ─────────────────────────────────────────────────────────────
+
+export async function fetchPatientsForClinical(search?: string): Promise<any[]> {
+  const supabase = createClient();
+
+  let query = supabase
+    .from('patients')
+    .select(`
+      id, full_name, birth_date, sex, current_status, photo_url, professional_id,
+      treatment_protocols ( protocol_name, status ),
+      professionals ( name )
+    `)
+    .order('full_name');
+
+  if (search) {
+    query = (query as any).or(`full_name.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data ?? []).map((p: any) => {
+    const birthDate = p.birth_date ? new Date(p.birth_date) : null;
+    const age = birthDate
+      ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 3600 * 1000))
+      : null;
+    const procedures = (p.treatment_protocols ?? [])
+      .filter((tp: any) => tp.status !== 'CONCLUIDO')
+      .map((tp: any) => tp.protocol_name)
+      .filter(Boolean);
+    return {
+      id: p.id,
+      name: p.full_name,
+      age,
+      last_consult: null,
+      status: p.current_status ?? 'ATIVO',
+      medico: p.professionals?.name ?? '—',
+      procedures,
+      risk: 'LOW' as const,
+      photo_url: p.photo_url ?? null,
+      risk_reasons: [] as string[],
+    };
+  });
+}
+
+export async function fetchPatientAnamnese(patientId: string): Promise<any | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patient_medical_history')
+    .select('*')
+    .eq('patient_id', patientId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function fetchPatientEvolutions(patientId: string): Promise<any[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patient_evolutions')
+    .select('*, professionals ( name )')
+    .eq('patient_id', patientId)
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((ev: any) => ({
+    ...ev,
+    medico: ev.professionals?.name ?? 'Desconhecido',
+  }));
+}
+
+export async function fetchPatientPrescriptions(patientId: string): Promise<any[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patient_prescriptions')
+    .select('*, prescription_items ( * ), professionals ( name )')
+    .eq('patient_id', patientId)
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    medico: r.professionals?.name ?? 'Desconhecido',
+    items: r.prescription_items ?? [],
+  }));
+}
+
+export async function fetchPatientExams(patientId: string): Promise<any[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patient_exams')
+    .select('*')
+    .eq('patient_id', patientId)
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((ex: any) => ({
+    ...ex,
+    data: ex.date,
+  }));
+}
+
+export async function insertEvolution(
+  patientId: string,
+  evData: { type: string; cid: string; subjetivo: string; objetivo: string; avaliacao: string; plano: string }
+): Promise<any> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patient_evolutions')
+    .insert({
+      patient_id: patientId,
+      date: new Date().toISOString().split('T')[0],
+      type: evData.type,
+      cid: evData.cid || 'Não informado',
+      subjetivo: evData.subjetivo,
+      objetivo: evData.objetivo,
+      avaliacao: evData.avaliacao,
+      plano: evData.plano,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertAnamnese(patientId: string, anamneseData: any): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('patient_medical_history')
+    .upsert({ patient_id: patientId, ...anamneseData }, { onConflict: 'patient_id' });
+  if (error) throw error;
+}
+
+export async function insertPrescription(
+  patientId: string,
+  prescData: { items: any[]; validade: string }
+): Promise<any> {
+  const supabase = createClient();
+  const { data: prescription, error: prescError } = await supabase
+    .from('patient_prescriptions')
+    .insert({
+      patient_id: patientId,
+      date: new Date().toISOString().split('T')[0],
+      validade: prescData.validade,
+      status: 'ATIVA',
+    })
+    .select()
+    .single();
+  if (prescError) throw prescError;
+
+  if (prescData.items.length > 0) {
+    const { error: itemsError } = await supabase
+      .from('prescription_items')
+      .insert(prescData.items.map((item: any) => ({ prescription_id: prescription.id, ...item })));
+    if (itemsError) throw itemsError;
+  }
+  return prescription;
+}
+
+export async function insertExam(
+  patientId: string,
+  examData: { name: string; date: string; lab: string; urgencia: string }
+): Promise<any> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patient_exams')
+    .insert({
+      patient_id: patientId,
+      name: examData.name,
+      date: examData.date || new Date().toISOString().split('T')[0],
+      lab: examData.lab || 'A definir',
+      status: 'SOLICITADO',
+      urgencia: examData.urgencia,
+      resultado: 'Aguardando resultado',
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ── Appointments ──────────────────────────────────────────────────────────────
+
 export async function fetchAppointmentsByDate(dateStr: string) {
   const supabase = createClient();
   const start = `${dateStr}T00:00:00.000Z`;
