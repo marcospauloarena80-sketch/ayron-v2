@@ -746,9 +746,11 @@ const PROFILE_CONTENT: Record<string, { icon: string; title: string; items: { ic
 };
 
 function WelcomeModal() {
-  const [open, setOpen] = useState(() => {
-    try { return localStorage.getItem('ayron_welcomed') !== 'true'; } catch { return false; }
-  });
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    try { if (localStorage.getItem('ayron_welcomed') !== 'true') setOpen(true); } catch {}
+  }, []);
   const [neverShow, setNeverShow] = useState(false);
   const [profile, setProfile] = useState('admin');
 
