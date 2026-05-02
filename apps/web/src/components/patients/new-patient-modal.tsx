@@ -257,7 +257,7 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
       setLgpdConsent(true);
       setShowMasterInput(false);
       setMasterInput('');
-      toast.success('Modo bypass ativado — campos obrigatórios liberados');
+      toast.success('Modo Master ativado — campos obrigatórios liberados');
     } else {
       toast.error('Senha master incorreta');
       setMasterInput('');
@@ -387,7 +387,7 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
       {masterBypass && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 mb-3 text-xs text-amber-700">
           <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
-          Modo bypass ativo — campos obrigatórios liberados. Paciente será salvo com dados incompletos.
+          Modo Master ativo — campos obrigatórios liberados. Paciente será salvo com dados incompletos.
         </div>
       )}
 
@@ -723,7 +723,7 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
                 ) : (
                   <button type="button" onClick={() => setShowMasterInput(true)}
                     className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-amber-600 transition-colors">
-                    <Lock className="h-3 w-3" /> bypass
+                    <Lock className="h-3 w-3" /> Acesso Master
                   </button>
                 )}
               </div>
