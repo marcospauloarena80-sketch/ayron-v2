@@ -565,17 +565,30 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
   const [editingAnamnese, setEditingAnamnese] = useState(false);
   const [anamneseData, setAnamneseData] = useState({ ...MOCK_ANAMNESE });
   const [editingEvolucaoId, setEditingEvolucaoId] = useState<string | null>(null);
-  const [evolucoes, setEvolucoes] = useState<any[]>(() => {
+  const [evolucoes, setEvolucoes] = useState<any[]>(MOCK_EVOLUCOES);
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(`ayron_evolucoes_${patient.id}`);
-      return stored ? JSON.parse(stored) : MOCK_EVOLUCOES;
-    } catch { return MOCK_EVOLUCOES; }
-  });
+      if (stored !== null) setEvolucoes(JSON.parse(stored));
+    } catch {}
+  }, [patient.id]);
   const [newEvolucao, setNewEvolucao] = useState({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
   const [showNovaReceita, setShowNovaReceita] = useState(false);
   const [showSolicitarExame, setShowSolicitarExame] = useState(false);
-  const [receitas, setReceitas] = useState(MOCK_RECEITAS);
-  const [exames, setExames] = useState(MOCK_EXAMES);
+  const [receitas, setReceitas] = useState<any[]>(MOCK_RECEITAS);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`ayron_receitas_${patient.id}`);
+      if (stored !== null) setReceitas(JSON.parse(stored));
+    } catch {}
+  }, [patient.id]);
+  const [exames, setExames] = useState<any[]>(MOCK_EXAMES);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`ayron_exames_${patient.id}`);
+      if (stored !== null) setExames(JSON.parse(stored));
+    } catch {}
+  }, [patient.id]);
   const [iaAgent, setIaAgent] = useState<'r1' | 'obesidade'>('r1');
   const [iaQuery, setIaQuery] = useState('');
   const [iaHistory, setIaHistory] = useState<{ role: 'user' | 'ayron'; text: string }[]>([
@@ -1297,12 +1310,20 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
       <NovaReceitaModal
         open={showNovaReceita}
         onClose={() => setShowNovaReceita(false)}
-        onSave={r => setReceitas(prev => [{ id: `R${Date.now()}`, date: new Date().toISOString().split('T')[0], medico: 'Usuário atual', validade: r.validade, items: r.items, status: 'ATIVA' }, ...prev])}
+        onSave={r => setReceitas(prev => {
+          const updated = [{ id: `R${Date.now()}`, date: new Date().toISOString().split('T')[0], medico: 'Usuário atual', validade: r.validade, items: r.items, status: 'ATIVA' }, ...prev];
+          try { localStorage.setItem(`ayron_receitas_${patient.id}`, JSON.stringify(updated)); } catch {}
+          return updated;
+        })}
       />
       <SolicitarExameModal
         open={showSolicitarExame}
         onClose={() => setShowSolicitarExame(false)}
-        onSave={e => setExames(prev => [...e.exames.map((name: string, i: number) => ({ id: `X${Date.now()}${i}`, name, data: new Date().toISOString().split('T')[0], lab: e.lab || 'A definir', status: 'SOLICITADO', resultado: 'Aguardando resultado' })), ...prev])}
+        onSave={e => setExames(prev => {
+          const updated = [...e.exames.map((name: string, i: number) => ({ id: `X${Date.now()}${i}`, name, data: new Date().toISOString().split('T')[0], lab: e.lab || 'A definir', status: 'SOLICITADO', resultado: 'Aguardando resultado' })), ...prev];
+          try { localStorage.setItem(`ayron_exames_${patient.id}`, JSON.stringify(updated)); } catch {}
+          return updated;
+        })}
       />
     </div>
   );
@@ -1356,7 +1377,7 @@ export default function ClinicalHubPage() {
             </button>
           </div>
         )}
-        <ProntuarioDetail patient={selected} onBack={() => setSelected(null)} />
+        <ProntuarioDetail key={selected.id} patient={selected} onBack={() => setSelected(null)} />
       </div>
     );
   }
