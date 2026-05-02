@@ -132,6 +132,32 @@ export async function fetchFinancialTransactions({
   }));
 }
 
+export async function insertFinancialTransaction(data: {
+  descricao: string;
+  valor: number;
+  tipo: 'RECEBER' | 'PAGAR';
+  vencimento: string;
+  pago_em?: string;
+  classificacao?: string;
+  conta?: string;
+  filial?: string;
+  forma_pagamento?: string;
+  patient_id?: string;
+}): Promise<any> {
+  const supabase = createClient();
+  const { data: row, error } = await supabase
+    .from('financial_transactions')
+    .insert({
+      ...data,
+      status: data.pago_em ? 'PAGO' : 'ABERTO',
+      pago: data.pago_em ? data.valor : 0,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return { ...row, saldo: Number(row.valor) - Number(row.pago ?? 0), controle: row.id.slice(0, 8).toUpperCase() };
+}
+
 // ── Appointments ──────────────────────────────────────────────────────────────
 
 // ── Clinical Hub ─────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ import { AdvancedFilter } from '@/components/ui/advanced-filter';
 import { ConfirmActionModal } from '@/components/ui/confirm-action-modal';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
-import { fetchFinancialTransactions } from '@/lib/supabase/queries';
+import { fetchFinancialTransactions, insertFinancialTransaction } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import {
@@ -864,6 +864,20 @@ const MOCK_LANCAMENTOS = [
 ];
 
 function LancamentosTab() {
+  const [formData, setFormData] = useState<{
+    descricao: string; valor: string; vencimento: string;
+    pago_em: string; classificacao: string; conta: string;
+    filial: string; forma_pagamento: string;
+  }>({
+    descricao: '', valor: '', vencimento: '', pago_em: '',
+    classificacao: 'Receita Clínica', conta: 'Caixa Principal',
+    filial: 'Principal', forma_pagamento: 'PIX',
+  });
+  const resetForm = () => setFormData({
+    descricao: '', valor: '', vencimento: '', pago_em: '',
+    classificacao: 'Receita Clínica', conta: 'Caixa Principal',
+    filial: 'Principal', forma_pagamento: 'PIX',
+  });
   const [tipoFilter, setTipoFilter] = useState('');
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
@@ -887,6 +901,32 @@ function LancamentosTab() {
     staleTime: 30_000,
   });
 
+  const queryClient = useQueryClient();
+  const [currentTipo, setCurrentTipo] = useState<'RECEBER' | 'PAGAR'>('RECEBER');
+
+  const insertMutation = useMutation({
+    mutationFn: (tipo: 'RECEBER' | 'PAGAR') =>
+      insertFinancialTransaction({
+        descricao: formData.descricao,
+        valor: parseFloat(formData.valor || '0'),
+        tipo,
+        vencimento: formData.vencimento,
+        pago_em: formData.pago_em || undefined,
+        classificacao: formData.classificacao || undefined,
+        conta: formData.conta || undefined,
+        filial: formData.filial || undefined,
+        forma_pagamento: formData.forma_pagamento || undefined,
+      }),
+    onSuccess: () => {
+      toast.success(currentTipo === 'RECEBER' ? 'Receita lançada ✓' : 'Despesa lançada ✓');
+      queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+      resetForm();
+      setShowNovaReceita(false);
+      setShowNovaDespesa(false);
+    },
+    onError: (e: any) => toast.error(`Erro ao salvar: ${e.message}`),
+  });
+
   const filtered = lancamentosDB.filter((l: any) => {
     if (tipoFilter && l.tipo !== tipoFilter) return false;
     if (conta && l.conta && !l.conta.toLowerCase().includes(conta.toLowerCase())) return false;
@@ -899,45 +939,28 @@ function LancamentosTab() {
   const LancamentoForm = ({ tipo, onClose }: { tipo: 'RECEITA' | 'DESPESA'; onClose: () => void }) => (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Select label="Unidade/Filial"><option>Principal</option><option>Filial 2</option></Select>
-        <Select label="Conta Corrente"><option>Caixa Principal</option><option>Conta Corrente</option><option>Poupança</option></Select>
+        <Select label="Unidade/Filial" value={formData.filial} onChange={(e: any) => setFormData(p => ({ ...p, filial: e.target.value }))}>
+          <option>Principal</option><option>Filial 2</option>
+        </Select>
+        <Select label="Conta Corrente" value={formData.conta} onChange={(e: any) => setFormData(p => ({ ...p, conta: e.target.value }))}>
+          <option>Caixa Principal</option><option>Conta Corrente</option><option>Poupança</option>
+        </Select>
       </div>
+      <Input label="Descrição *" placeholder={tipo === 'RECEITA' ? 'Descrição da receita...' : 'Descrição da despesa...'} value={formData.descricao} onChange={(e: any) => setFormData(p => ({ ...p, descricao: e.target.value }))} />
       <div className="grid grid-cols-2 gap-3">
-        <Input label="Nr. Documento" placeholder="Nº do documento" />
-        <Input label="Nr. Controle" placeholder="Nº de controle" />
-      </div>
-      <Input label="Descrição *" placeholder={tipo === 'RECEITA' ? 'Descrição da receita...' : 'Descrição da despesa...'} />
-      <Input label={tipo === 'RECEITA' ? 'Cliente/Paciente' : 'Fornecedor'} placeholder="Nome..." />
-      <div className="grid grid-cols-2 gap-3">
-        <Select label="Classificação">
+        <Select label="Classificação" value={formData.classificacao} onChange={(e: any) => setFormData(p => ({ ...p, classificacao: e.target.value }))}>
           <option>Receita Clínica</option><option>Despesa Fixa</option>
           <option>Insumos</option><option>Marketing</option><option>Impostos</option><option>Outro</option>
         </Select>
-        <Input label="Valor (R$) *" type="number" placeholder="0,00" />
+        <Input label="Valor (R$) *" type="number" placeholder="0,00" value={formData.valor} onChange={(e: any) => setFormData(p => ({ ...p, valor: e.target.value }))} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Input label="Vencimento *" type="date" />
-        <Input label="Quitação" type="date" />
+        <Input label="Vencimento *" type="date" value={formData.vencimento} onChange={(e: any) => setFormData(p => ({ ...p, vencimento: e.target.value }))} />
+        <Input label="Quitação" type="date" value={formData.pago_em} onChange={(e: any) => setFormData(p => ({ ...p, pago_em: e.target.value }))} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Select label="Forma de Pagamento">
-          <option>PIX</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Boleto</option>
-        </Select>
-        <div>
-          <label className="block text-xs font-medium mb-1">Repetir</label>
-          <div className="flex gap-2 items-center">
-            <select className="flex-1 rounded-lg border border-border px-2 py-1.5 text-xs bg-white outline-none">
-              <option value="">Não repetir</option>
-              <option>Mensal</option><option>Semanal</option><option>Anual</option>
-            </select>
-            <input type="number" min="1" max="36" placeholder="N" className="w-16 rounded-lg border border-border px-2 py-1.5 text-xs outline-none" />
-            <span className="text-xs text-muted-foreground">meses</span>
-          </div>
-        </div>
-      </div>
-      <Input label="Taxa Adm. (%)" type="number" placeholder="0" />
-      <textarea placeholder="Observações..." rows={2}
-        className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+      <Select label="Forma de Pagamento" value={formData.forma_pagamento} onChange={(e: any) => setFormData(p => ({ ...p, forma_pagamento: e.target.value }))}>
+        <option>PIX</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Boleto</option>
+      </Select>
       <p className="text-xs text-muted-foreground">Edição por: usuário atual</p>
     </div>
   );
@@ -1041,7 +1064,12 @@ function LancamentosTab() {
         <LancamentoForm tipo="RECEITA" onClose={() => setShowNovaReceita(false)} />
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={() => setShowNovaReceita(false)}>Cancelar</Button>
-          <Button onClick={() => { toast.success('Receita lançada'); setShowNovaReceita(false); }}>Salvar Receita</Button>
+          <Button
+            disabled={insertMutation.isPending || !formData.descricao || !formData.valor || !formData.vencimento}
+            onClick={() => { setCurrentTipo('RECEBER'); insertMutation.mutate('RECEBER'); }}
+          >
+            {insertMutation.isPending ? 'Salvando...' : 'Salvar Receita'}
+          </Button>
         </DialogFooter>
       </Dialog>
 
@@ -1050,7 +1078,12 @@ function LancamentosTab() {
         <LancamentoForm tipo="DESPESA" onClose={() => setShowNovaDespesa(false)} />
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={() => setShowNovaDespesa(false)}>Cancelar</Button>
-          <Button onClick={() => { toast.success('Despesa lançada'); setShowNovaDespesa(false); }}>Salvar Despesa</Button>
+          <Button
+            disabled={insertMutation.isPending || !formData.descricao || !formData.valor || !formData.vencimento}
+            onClick={() => { setCurrentTipo('PAGAR'); insertMutation.mutate('PAGAR'); }}
+          >
+            {insertMutation.isPending ? 'Salvando...' : 'Salvar Despesa'}
+          </Button>
         </DialogFooter>
       </Dialog>
 
