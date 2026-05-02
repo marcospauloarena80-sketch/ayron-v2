@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
+import { createClient } from '@/lib/supabase/client';
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -82,7 +83,8 @@ export function Sidebar() {
     catch {}
   }, [collapsed]);
 
-  function handleLogout() {
+  async function handleLogout() {
+    await createClient().auth.signOut();
     logout();
     router.push('/login');
   }

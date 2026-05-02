@@ -8,6 +8,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore, UNITS, MOCK_USERS_BY_ROLE, type UserRole } from '@/store/auth.store';
 import api from '@/lib/api';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -285,7 +286,8 @@ export function Topbar({ title, subtitle, actions }: { title: string; subtitle?:
     setDropdownOpen(false);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    await createClient().auth.signOut();
     logout();
     router.push('/login');
   }

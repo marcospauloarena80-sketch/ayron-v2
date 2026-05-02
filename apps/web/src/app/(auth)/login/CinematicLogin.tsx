@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
+import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -194,15 +195,49 @@ function LoginForm() {
     }
 
     try {
-      const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+      const supabase = createClient();
+      const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
       });
-      const json = await res.json();
-      if (!res.ok) { setError(json.message ?? 'E-mail ou senha incorretos'); return; }
-      setAuth(json.user, json.access_token);
-      document.cookie = `ayron_token=${json.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+
+      if (sbError) {
+        setError('E-mail ou senha incorretos');
+        return;
+      }
+
+      const sbUser = sbData.user;
+      const meta = sbUser.user_metadata ?? {};
+
+      const ROLE_PERMISSIONS: Record<string, string[]> = {
+        MASTER: ['*'],
+        ADMIN: ['patients.*', 'agenda.*', 'clinical.*', 'financial.*', 'settings.*', 'marketing.*', 'reports.*'],
+        GERENTE: ['patients.view', 'agenda.*', 'financial.*', 'reports.*', 'marketing.*'],
+        MEDICO: ['patients.*', 'agenda.view', 'clinical.*', 'sessions.*'],
+        ENFERMEIRO: ['patients.view', 'agenda.view', 'clinical.view', 'sessions.*'],
+        RECEPCIONISTA: ['patients.view', 'agenda.*', 'financial.view'],
+      };
+
+      const role = (meta.role ?? 'MEDICO') as any;
+      const mappedUser = {
+        id: sbUser.id,
+        name: meta.name ?? sbUser.email ?? 'Usuário',
+        email: sbUser.email ?? '',
+        role,
+        clinic_id: meta.clinic_id ?? 'clinic-1',
+        unit: meta.unit ?? 'Clínica Barra',
+        permissions: ROLE_PERMISSIONS[role] ?? ['*'],
+        preferences: {
+          theme: 'light' as const,
+          language: 'pt-BR' as const,
+          notifications: true,
+          emailDigest: false,
+        },
+      };
+
+      const token = sbData.session?.access_token ?? 'supabase-token';
+      setAuth(mappedUser, token);
+      document.cookie = `ayron_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
       router.push('/dashboard');
     } catch {
       setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
