@@ -616,7 +616,11 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
       subjetivo: newEvolucao.subjetivo, objetivo: newEvolucao.objetivo,
       avaliacao: newEvolucao.avaliacao, plano: newEvolucao.plano, ai_summary: null,
     };
-    setEvolucoes(prev => [ev, ...prev]);
+    setEvolucoes(prev => {
+      const updated = [ev, ...prev];
+      try { localStorage.setItem(`ayron_evolucoes_${patient.id}`, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     setNewEvolucao({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
     setShowNewEvolucao(false);
     setActiveTab('evolucoes');
