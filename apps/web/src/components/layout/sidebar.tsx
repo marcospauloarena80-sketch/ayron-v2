@@ -105,19 +105,13 @@ export function Sidebar() {
         {NAV.map(({ href, label, icon: Icon, badgeKey }, index) => {
           const active = pathname === href || pathname.startsWith(href + '/');
           const count = getBadgeCount(badgeKey);
-          // Primeiros 7 = rim light B (moderado) | Últimos 8 = rim light C (bold)
-          const activeClass = index < 7
-            ? [
-                'text-primary font-medium',
-                'bg-gradient-to-r from-primary/20 to-primary/5',
-                '[box-shadow:inset_0_0_0_1px_rgba(255,106,0,0.20),inset_0_1px_0_rgba(255,255,255,0.28),0_2px_10px_rgba(255,106,0,0.20)]',
-              ].join(' ')
-            : [
-                'text-primary font-semibold',
-                'bg-gradient-to-r from-primary/28 to-primary/8',
-                'border border-white/20',
-                '[box-shadow:inset_0_0_0_1px_rgba(255,106,0,0.35),inset_0_1px_0_rgba(255,255,255,0.50),0_0_18px_rgba(255,106,0,0.38)]',
-              ].join(' ');
+          // Todos os itens = rim light C (bold)
+          const activeClass = [
+            'text-primary font-semibold',
+            'bg-gradient-to-r from-primary/28 to-primary/8',
+            'border border-white/20',
+            '[box-shadow:inset_0_0_0_1px_rgba(255,106,0,0.35),inset_0_1px_0_rgba(255,255,255,0.50),0_0_18px_rgba(255,106,0,0.38)]',
+          ].join(' ');
           return (
             <Link key={href} href={href}>
               <motion.div

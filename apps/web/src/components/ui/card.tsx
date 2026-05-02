@@ -7,11 +7,11 @@ export function Card({ className, ...props }: CardProps) {
     <div
       className={cn(
         'relative z-0',
-        'rounded-[16px] border border-white/40 p-6',
-        'bg-white/[0.72] backdrop-blur-[16px]',
-        '[box-shadow:var(--glass-shadow)]',
+        'rounded-[16px] border border-white/60 p-6',
+        'bg-white/[0.88] backdrop-blur-[16px]',
+        '[box-shadow:0_4px_24px_rgba(0,0,0,0.09),0_1px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.90)]',
         'transition-all duration-[220ms] ease',
-        'hover:[box-shadow:var(--glass-shadow-hover)] hover:-translate-y-px',
+        'hover:[box-shadow:0_8px_32px_rgba(0,0,0,0.13),0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.90)] hover:-translate-y-px',
         className
       )}
       {...props}
