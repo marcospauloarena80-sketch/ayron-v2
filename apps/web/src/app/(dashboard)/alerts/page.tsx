@@ -1,5 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchAlerts } from '@/lib/supabase/queries';
 import { Topbar } from '@/components/layout/topbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -370,7 +372,16 @@ function AlertCard({ alert, onUpdate }: {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState<AlertItem[]>(INITIAL_ALERTS);
+  const { data: alertsData = INITIAL_ALERTS } = useQuery({
+    queryKey: ['alerts'],
+    queryFn: () => fetchAlerts().catch(() => INITIAL_ALERTS),
+    staleTime: 30_000,
+  });
+  const [localAlerts, setLocalAlerts] = useState<AlertItem[]>([]);
+
+  useEffect(() => {
+    setLocalAlerts(alertsData as AlertItem[]);
+  }, [alertsData]);
   const [statusFilter, setStatusFilter] = useState<AlertStatus | ''>('OPEN');
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | ''>('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -378,11 +389,11 @@ export default function AlertsPage() {
   const [running, setRunning] = useState(false);
 
   const handleUpdate = (id: string, changes: Partial<AlertItem>) => {
-    setAlerts(prev => prev.map(a => a.id === id ? { ...a, ...changes } : a));
+    setLocalAlerts(prev => prev.map(a => a.id === id ? { ...a, ...changes } : a));
   };
 
   const handleSaveAlerta = (a: AlertItem) => {
-    setAlerts(prev => [a, ...prev]);
+    setLocalAlerts(prev => [a, ...prev]);
   };
 
   const runEngine = () => {
@@ -399,21 +410,21 @@ export default function AlertsPage() {
         patient: { id: 'P003', full_name: 'Beatriz Fernandes' },
         created_at: new Date().toISOString(),
       };
-      setAlerts(prev => [newAlert, ...prev.filter(a => a.id !== newAlert.id)]);
+      setLocalAlerts(prev => [newAlert, ...prev.filter(a => a.id !== newAlert.id)]);
       toast.success('Motor de alertas executado — 1 novo alerta gerado');
       setRunning(false);
     }, 1200);
   };
 
-  const filtered = alerts.filter(a => {
+  const filtered = localAlerts.filter(a => {
     if (statusFilter && a.status !== statusFilter) return false;
     if (severityFilter && a.severity !== severityFilter) return false;
     if (categoryFilter && a.category !== categoryFilter) return false;
     return true;
   });
 
-  const openCount = alerts.filter(a => a.status === 'OPEN').length;
-  const criticalCount = alerts.filter(a => a.severity === 'CRITICAL' && a.status === 'OPEN').length;
+  const openCount = localAlerts.filter(a => a.status === 'OPEN').length;
+  const criticalCount = localAlerts.filter(a => a.severity === 'CRITICAL' && a.status === 'OPEN').length;
 
   return (
     <div>
@@ -425,8 +436,8 @@ export default function AlertsPage() {
           {[
             { label: 'Abertos', value: openCount, color: 'bg-red-50 border-red-200 text-red-700' },
             { label: 'Críticos', value: criticalCount, color: 'bg-orange-50 border-orange-200 text-orange-700' },
-            { label: 'Total', value: alerts.length, color: 'bg-white border-border text-foreground' },
-            { label: 'Resolvidos', value: alerts.filter(a => a.status === 'RESOLVED').length, color: 'bg-green-50 border-green-200 text-green-700' },
+            { label: 'Total', value: localAlerts.length, color: 'bg-white border-border text-foreground' },
+            { label: 'Resolvidos', value: localAlerts.filter(a => a.status === 'RESOLVED').length, color: 'bg-green-50 border-green-200 text-green-700' },
           ].map(({ label, value, color }) => (
             <div key={label} className={cn('rounded-xl border p-3 text-center', color)}>
               <p className="text-xl font-bold">{value}</p>

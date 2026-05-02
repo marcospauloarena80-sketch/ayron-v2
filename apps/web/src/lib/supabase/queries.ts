@@ -497,3 +497,37 @@ export async function fetchAppointmentsByDate(dateStr: string) {
   if (error) throw error;
   return data ?? [];
 }
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+
+function suggestedActionsForType(type: string): { key: string; label: string }[] {
+  switch (type) {
+    case 'RETORNO': return [{ key: 'contact', label: 'Enviar mensagem' }, { key: 'schedule', label: 'Agendar retorno' }];
+    case 'FINANCEIRO': return [{ key: 'payment', label: 'Registrar pagamento' }];
+    case 'PROTOCOLO': return [{ key: 'schedule', label: 'Agendar sessão' }];
+    default: return [{ key: 'view', label: 'Ver detalhes' }];
+  }
+}
+
+export async function fetchAlerts(): Promise<any[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('alerts')
+    .select('*, patients(id, full_name)')
+    .in('status', ['OPEN', 'ACKNOWLEDGED'])
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((a: any) => ({
+    id: a.id,
+    title: a.title,
+    message: a.description ?? '',
+    severity: a.severity,
+    status: a.status,
+    category: (a.type ?? 'CLINICO').toLowerCase(),
+    rationale: [],
+    suggested_actions: suggestedActionsForType(a.type),
+    patient: a.patients ? { id: a.patients.id, full_name: a.patients.full_name } : undefined,
+    created_at: a.created_at,
+  }));
+}
