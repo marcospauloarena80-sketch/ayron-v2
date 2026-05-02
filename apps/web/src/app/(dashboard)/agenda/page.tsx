@@ -14,7 +14,7 @@ import { KanbanView } from '@/components/agenda/kanban-view';
 import { FinalizeModal } from '@/components/agenda/finalize-modal';
 import { ChevronLeft, ChevronRight, Plus, UserCheck, LogOut, Calendar, Filter, FileText, Grid, List, DollarSign, Columns, CheckSquare, Users, Timer, ChevronDown, X, Search, Printer, MessageCircle, LayoutGrid, MoreHorizontal } from 'lucide-react';
 import api from '@/lib/api';
-import { fetchProfessionals, fetchAppointmentsByDate } from '@/lib/supabase/queries';
+import { fetchProfessionals, fetchAppointmentsByDate, updateAppointmentStatus, closeDailyAppointments } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -595,27 +595,27 @@ export default function AgendaPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.patch(`/agenda/${id}`, { status }).then(r => r.data),
+      updateAppointmentStatus(id, status),
     onSuccess: () => { toast.success('Status atualizado'); qc.invalidateQueries({ queryKey: ['agenda'] }); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Erro ao atualizar status'),
+    onError: (e: any) => toast.error((e as any).message ?? 'Erro ao atualizar status'),
   });
 
   const checkInMutation = useMutation({
-    mutationFn: (appt: any) => api.post(`/agenda/${appt.id}/checkin`).then(r => ({ ...r, appt })),
-    onSuccess: (r) => { toast.success('Check-in realizado'); setActiveTimerAppt(r.appt); qc.invalidateQueries({ queryKey: ['agenda'] }); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Erro no check-in'),
+    mutationFn: (appt: any) => updateAppointmentStatus(appt.id, 'CHECKED_IN').then(r => ({ r, appt })),
+    onSuccess: (r: any) => { toast.success('Check-in realizado'); setActiveTimerAppt(r.appt); qc.invalidateQueries({ queryKey: ['agenda'] }); },
+    onError: (e: any) => toast.error((e as any).message ?? 'Erro no check-in'),
   });
 
   const checkOutMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/agenda/${id}/checkout`),
+    mutationFn: (id: string) => updateAppointmentStatus(id, 'COMPLETED'),
     onSuccess: () => { toast.success('Atendimento encerrado'); setActiveTimerAppt(null); qc.invalidateQueries({ queryKey: ['agenda'] }); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Erro no check-out'),
+    onError: (e: any) => toast.error((e as any).message ?? 'Erro no check-out'),
   });
 
   const closingMutation = useMutation({
-    mutationFn: () => api.post(`/agenda/daily-closing/${dateStr}`),
-    onSuccess: () => { toast.success('Fechamento diário realizado!'); qc.invalidateQueries({ queryKey: ['closing', dateStr] }); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Erro no fechamento'),
+    mutationFn: () => closeDailyAppointments(dateStr),
+    onSuccess: () => { toast.success('Fechamento diário realizado!'); qc.invalidateQueries({ queryKey: ['closing', dateStr] }); qc.invalidateQueries({ queryKey: ['agenda'] }); },
+    onError: (e: any) => toast.error((e as any).message ?? 'Erro no fechamento'),
   });
 
   // Compute unique types from today's appointments

@@ -531,3 +531,49 @@ export async function fetchAlerts(): Promise<any[]> {
     created_at: a.created_at,
   }));
 }
+
+// ── Appointments mutations ────────────────────────────────────────────────────
+
+export async function insertAppointment(data: {
+  patient_id: string;
+  professional_id: string;
+  start_time: string;
+  end_time: string;
+  type?: string;
+  notes?: string;
+  procedure_name?: string;
+  convenio?: string;
+  service_id?: string;
+}): Promise<any> {
+  const supabase = createClient();
+  const { data: row, error } = await supabase
+    .from('appointments')
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw error;
+  return row;
+}
+
+export async function updateAppointmentStatus(id: string, status: string): Promise<any> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('appointments')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function closeDailyAppointments(dateStr: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status: 'NO_SHOW' })
+    .in('status', ['SCHEDULED', 'CONFIRMED'])
+    .gte('start_time', `${dateStr}T00:00:00`)
+    .lte('start_time', `${dateStr}T23:59:59`);
+  if (error) throw error;
+}

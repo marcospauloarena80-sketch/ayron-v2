@@ -8,6 +8,7 @@ import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Search, User, Stethoscope, Package, Clock, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
 import api from '@/lib/api';
+import { insertAppointment, insertPatient } from '@/lib/supabase/queries';
 
 const TYPE_LABELS: Record<string, string> = {
   CONSULTATION: 'Consulta', RETURN: 'Retorno', PROCEDURE: 'Procedimento',
@@ -257,8 +258,9 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
         const start = new Date(date + 'T00:00:00');
         start.setHours(h, m, 0, 0);
         const end = new Date(start.getTime() + durationMin * 60 * 1000);
-        const r = await api.post('/agenda', { ...buildAppt(date, selectedSlot!), start_time: start.toISOString(), end_time: end.toISOString() });
-        return { created: 1, skipped: 0, firstName: r.data.patient?.full_name ?? patient?.full_name };
+        const apptData = buildAppt(date, selectedSlot!);
+        await insertAppointment({ ...apptData, start_time: start.toISOString(), end_time: end.toISOString() });
+        return { created: 1, skipped: 0, firstName: patient?.full_name };
       }
 
       // Recurring: iterate days over recMonths
@@ -270,15 +272,8 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
         if (recDays.includes(cursor.getDay())) {
           const d = format(cursor, 'yyyy-MM-dd');
           try {
-            const avail = await api.get('/agenda/availability', {
-              params: { professional_id: professional.id, date: d },
-            });
-            const slots: string[] = Array.isArray(avail.data) ? avail.data : [];
-            const slot = slots.includes(selectedSlot!) ? selectedSlot! : slots[0];
-            if (!slot) { skipped++; } else {
-              await api.post('/agenda', buildAppt(d, slot));
-              created++;
-            }
+            await insertAppointment(buildAppt(d, selectedSlot!));
+            created++;
           } catch { skipped++; }
         }
         cursor = addDays(cursor, 1);
@@ -361,12 +356,12 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
                 onClick={async () => {
                   setInlineCreateLoading(true);
                   try {
-                    const r = await api.post('/patients', { full_name: inlineName.trim(), phone: inlinePhone.trim() });
-                    setPatient(r.data);
+                    const r = await insertPatient({ full_name: inlineName.trim(), phone: inlinePhone.trim() });
+                    setPatient(r);
                     setShowInlineCreate(false);
                     toast.success(`Paciente "${inlineName.trim()}" cadastrado`);
                   } catch (e: any) {
-                    toast.error(e.response?.data?.message ?? 'Erro ao cadastrar paciente');
+                    toast.error((e as any).message ?? 'Erro ao cadastrar paciente');
                   } finally {
                     setInlineCreateLoading(false);
                   }
