@@ -47,7 +47,7 @@
 
   body {
     @apply text-foreground antialiased;
-    background: linear-gradient(135deg, #F7F9FB 0%, #EEF2F7 100%);
+    background: linear-gradient(135deg, #E6EDF5 0%, #D9E4EF 100%);
     background-attachment: fixed;
     min-height: 100vh;
   }
@@ -70,6 +70,30 @@
   select:focus-visible,
   button:focus-visible {
     outline: none;
+  }
+}
+
+/* ── Elevação Global de Painéis ─────────────────────────────────────────── */
+/* Aplica sombra e rim light em qualquer painel com rounded-xl/2xl + border-border
+   sem tocar nas páginas individuais. Inputs e buttons usam rounded-[10px] — não afetados. */
+
+@layer components {
+  .border-border.rounded-xl,
+  .border-border.rounded-2xl {
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.09),
+      0 1px 4px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    background-color: rgba(255, 255, 255, 0.92);
+  }
+
+  /* Overflow-hidden panels (tabelas) — mesma elevação sem alterar background */
+  .border-border.rounded-xl.overflow-hidden,
+  .border-border.rounded-2xl.overflow-hidden {
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.09),
+      0 1px 4px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
 }
 
