@@ -66,10 +66,16 @@ export function Sidebar() {
     return 0;
   }
 
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('ayron_sidebar_collapsed') === 'true'; }
-    catch { return false; }
-  });
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+
+  // Sync collapsed state from localStorage after mount (avoids SSR/client hydration mismatch)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('ayron_sidebar_collapsed') === 'true') {
+        setCollapsed(true);
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem('ayron_sidebar_collapsed', String(collapsed)); }
