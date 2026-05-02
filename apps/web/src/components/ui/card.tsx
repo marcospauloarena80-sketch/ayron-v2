@@ -6,6 +6,7 @@ export function Card({ className, ...props }: CardProps) {
   return (
     <div
       className={cn(
+        'relative z-0',
         'rounded-[16px] border border-white/40 p-6',
         'bg-white/[0.72] backdrop-blur-[16px]',
         '[box-shadow:var(--glass-shadow)]',
