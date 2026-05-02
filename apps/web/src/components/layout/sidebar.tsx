@@ -102,23 +102,32 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
-        {NAV.map(({ href, label, icon: Icon, badgeKey }) => {
+        {NAV.map(({ href, label, icon: Icon, badgeKey }, index) => {
           const active = pathname === href || pathname.startsWith(href + '/');
           const count = getBadgeCount(badgeKey);
+          // Primeiros 7 = rim light B (moderado) | Últimos 8 = rim light C (bold)
+          const activeClass = index < 7
+            ? [
+                'text-primary font-medium',
+                'bg-gradient-to-r from-primary/20 to-primary/5',
+                '[box-shadow:inset_0_0_0_1px_rgba(255,106,0,0.20),inset_0_1px_0_rgba(255,255,255,0.28),0_2px_10px_rgba(255,106,0,0.20)]',
+              ].join(' ')
+            : [
+                'text-primary font-semibold',
+                'bg-gradient-to-r from-primary/28 to-primary/8',
+                'border border-white/20',
+                '[box-shadow:inset_0_0_0_1px_rgba(255,106,0,0.35),inset_0_1px_0_rgba(255,255,255,0.50),0_0_18px_rgba(255,106,0,0.38)]',
+              ].join(' ');
           return (
             <Link key={href} href={href}>
               <motion.div
                 whileHover={{ x: collapsed ? 0 : 2 }}
                 title={collapsed ? label : undefined}
                 className={cn(
-                  'relative flex items-center rounded-lg py-2.5 text-sm font-medium transition-colors mb-0.5',
+                  'relative flex items-center rounded-lg py-2.5 text-sm font-medium transition-all duration-[220ms] mb-0.5',
                   collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                   active
-                    ? [
-                        'text-primary font-medium',
-                        'bg-gradient-to-r from-primary/20 to-primary/5',
-                        '[box-shadow:inset_0_0_0_1px_rgba(255,106,0,0.20),0_2px_8px_rgba(255,106,0,0.15)]',
-                      ].join(' ')
+                    ? activeClass
                     : [
                         'text-muted-foreground',
                         'hover:bg-white/60 hover:text-foreground',
