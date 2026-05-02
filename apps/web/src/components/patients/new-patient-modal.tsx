@@ -15,6 +15,8 @@ import { useAuthStore } from '@/store/auth.store';
 import { tagsService, CAN_CREATE_TAG, TagsApiNotAvailableError } from '@/lib/tags-service';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/client';
+import { insertPatient, updatePatient } from '@/lib/supabase/queries';
 
 // ─── Mask helpers ──────────────────────────────────────────────
 function maskCpf(v: string) {
@@ -265,7 +267,7 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
   };
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) => {
+    mutationFn: async (data: FormData) => {
       const prefs = data.preferences ?? {};
       const payload: any = {
         ...data,
@@ -300,14 +302,30 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
           personal: prefs.personal || undefined,
         },
       };
-      if (isEdit) return api.patch(`/patients/${patient.id}`, payload).then(r => r.data);
-      return api.post('/patients', payload).then(r => r.data);
+      if (isEdit) {
+        try {
+          return await updatePatient(patient.id, payload);
+        } catch {
+          return api.patch(`/patients/${patient.id}`, payload).then(r => r.data);
+        }
+      }
+      try {
+        return await insertPatient(payload);
+      } catch {
+        return api.post('/patients', payload).then(r => r.data);
+      }
     },
-    onSuccess: async (p) => {
+    onSuccess: async (p: any) => {
       if (!isEdit && lgpdConsent) {
         try {
-          await api.post(`/patients/${p.id}/consent`, { consent_type: 'TREATMENT_DATA', accepted: true });
-        } catch {}
+          const supabase = createClient();
+          await supabase.from('patients').update({
+            lgpd_consent: true,
+            lgpd_consent_at: new Date().toISOString(),
+          }).eq('id', p.id);
+        } catch {
+          // best effort
+        }
       }
       toast.success(isEdit ? `Paciente ${p.full_name} atualizado` : `Paciente ${p.full_name} criado`);
       qc.invalidateQueries({ queryKey: ['patients'] });

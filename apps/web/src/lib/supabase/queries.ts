@@ -312,6 +312,80 @@ export async function insertExam(
   return data;
 }
 
+// ── Patient Insert / Update ───────────────────────────────────────────────────
+
+async function generatePatientId(): Promise<string> {
+  const supabase = createClient();
+  const { data } = await supabase.from('patients').select('id');
+  const existing = new Set((data ?? []).map((r: any) => r.id));
+  for (let attempts = 0; attempts < 20; attempts++) {
+    const digits = String(Math.floor(Math.random() * 9000) + 1000);
+    const id = `P${digits}`;
+    if (!existing.has(id)) return id;
+  }
+  // Fallback: timestamp-based
+  return `P${Date.now().toString().slice(-4)}`;
+}
+
+function buildPatientRow(payload: any): Record<string, any> {
+  const addr = payload.address ?? {};
+  const row: Record<string, any> = {
+    full_name: payload.full_name,
+    birth_date: payload.birth_date || null,
+    sex: payload.sex === 'OUTRO' ? null : (payload.sex || null),
+    phone: payload.phone || null,
+    email: payload.email || null,
+    cpf: payload.cpf || null,
+    rg: payload.rg || null,
+    nationality: payload.nationality || 'BR',
+    address_zip: addr.cep || null,
+    address_street: addr.street || null,
+    address_number: addr.number || null,
+    address_complement: addr.complement || null,
+    address_neighborhood: addr.neighborhood || null,
+    address_city: addr.city || null,
+    address_state: addr.state || null,
+    tier: payload.tier || 'SILVER',
+    tipo_contato: payload.tipo_contato || 'WHATSAPP',
+    mala_direta: payload.mala_direta ?? false,
+    tags: payload.tags ?? [],
+    notes: payload.notes || null,
+    photo_url: payload.photo_url || null,
+  };
+  // Remove undefined/null keys that weren't explicitly set to null
+  return row;
+}
+
+export async function insertPatient(payload: any): Promise<any> {
+  const supabase = createClient();
+  const id = await generatePatientId();
+  const row = {
+    ...buildPatientRow(payload),
+    id,
+    current_status: 'NOVA_LEAD',
+  };
+  const { data, error } = await supabase
+    .from('patients')
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePatient(patientId: string, payload: any): Promise<any> {
+  const supabase = createClient();
+  const row = buildPatientRow(payload);
+  const { data, error } = await supabase
+    .from('patients')
+    .update(row)
+    .eq('id', patientId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // ── Appointments ──────────────────────────────────────────────────────────────
 
 export async function fetchAppointmentsByDate(dateStr: string) {
