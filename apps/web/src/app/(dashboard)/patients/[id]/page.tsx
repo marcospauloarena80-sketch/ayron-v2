@@ -43,6 +43,7 @@ import {
   ChevronDown, ChevronRight, X, CreditCard,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { fetchPatientById } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 
 // ─── Constants ────────────────────────────────────────────────
@@ -1078,7 +1079,7 @@ export default function PatientDetailPage() {
 
   const { data: patient, isLoading, error } = useQuery({
     queryKey: ['patient', id],
-    queryFn: () => api.get(`/patients/${id}`).then(r => r.data),
+    queryFn: () => fetchPatientById(id!).catch(() => api.get(`/patients/${id}`).then(r => r.data)),
     enabled: !!id,
     staleTime: 30_000,
   });

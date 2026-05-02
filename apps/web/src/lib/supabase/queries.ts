@@ -386,6 +386,20 @@ export async function updatePatient(patientId: string, payload: any): Promise<an
   return data;
 }
 
+// ── Patient Detail ────────────────────────────────────────────────────────────
+
+export async function fetchPatientById(patientId: string): Promise<any> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patients')
+    .select('*, appointments(id, start_time, end_time, status, type, professional_id, professionals(name))')
+    .eq('id', patientId)
+    .order('start_time', { referencedTable: 'appointments', ascending: false })
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // ── Appointments ──────────────────────────────────────────────────────────────
 
 export async function fetchAppointmentsByDate(dateStr: string) {
