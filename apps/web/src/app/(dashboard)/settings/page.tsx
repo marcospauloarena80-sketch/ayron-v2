@@ -304,7 +304,7 @@ function UserModal({ item, onSave, onClose }: {
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Perfil</label>
             <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-              className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm">
+              className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms]">
               {Object.keys(ROLE_LABELS).map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
             </select>
           </div>
@@ -427,7 +427,7 @@ function ProcedureModal({ item, onSave, onClose }: {
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">Categoria</label>
               <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm">
+                className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms]">
                 {['Hormonal','Emagrecimento','Nutrição','Longevidade','Anabolizante','Outros'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
