@@ -53,6 +53,7 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
+      type="button"
       className={cn(
         'inline-flex items-center justify-center gap-2',
         'rounded-[10px] font-medium',
