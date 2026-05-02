@@ -14,7 +14,7 @@ import { KanbanView } from '@/components/agenda/kanban-view';
 import { FinalizeModal } from '@/components/agenda/finalize-modal';
 import { ChevronLeft, ChevronRight, Plus, UserCheck, LogOut, Calendar, Filter, FileText, Grid, List, DollarSign, Columns, CheckSquare, Users, Timer, ChevronDown, X, Search, Printer, MessageCircle, LayoutGrid, MoreHorizontal } from 'lucide-react';
 import api from '@/lib/api';
-import { fetchProfessionals } from '@/lib/supabase/queries';
+import { fetchProfessionals, fetchAppointmentsByDate } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -567,7 +567,16 @@ export default function AgendaPage() {
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['agenda', dateStr],
-    queryFn: () => api.get('/agenda', { params: { date: dateStr } }).then(r => r.data),
+    queryFn: () => fetchAppointmentsByDate(dateStr)
+      .then(rows => rows.map((a: any) => ({
+        ...a,
+        patient: { id: a.patient_id, name: a.patients?.full_name ?? '', phone: a.patients?.phone ?? '', tier: a.patients?.tier ?? '' },
+        professional: { id: a.professional_id, name: a.professionals?.name ?? '', color: a.professionals?.color ?? '#6366f1' },
+        time: a.start_time ? new Date(a.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+        duration: a.end_time && a.start_time ? Math.round((new Date(a.end_time).getTime() - new Date(a.start_time).getTime()) / 60000) : 60,
+        service: { name: a.procedure_name ?? a.type ?? 'Consulta', category: a.type ?? 'CONSULTATION' },
+      })))
+      .catch(() => []),
     staleTime: 30_000,
   });
 
