@@ -304,7 +304,7 @@ function UserModal({ item, onSave, onClose }: {
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Perfil</label>
             <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm">
+              className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm">
               {Object.keys(ROLE_LABELS).map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
             </select>
           </div>
@@ -427,7 +427,7 @@ function ProcedureModal({ item, onSave, onClose }: {
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">Categoria</label>
               <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm">
+                className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm">
                 {['Hormonal','Emagrecimento','Nutrição','Longevidade','Anabolizante','Outros'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
@@ -1277,7 +1277,7 @@ function ProfilePanel() {
         <div className="col-span-2">
           <label className="text-xs font-medium text-muted-foreground block mb-1">Bio profissional</label>
           {editing
-            ? <textarea rows={3} className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} />
+            ? <textarea rows={3} className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms] resize-none" value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} />
             : <p className="text-sm py-2 px-3 rounded-lg bg-muted/50">{form.bio}</p>
           }
         </div>
@@ -1377,9 +1377,9 @@ function MedicationsPanel() {
       <div className="flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar medicamento..." className="w-full rounded-lg border border-border pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar medicamento..." className="w-full bg-white/60 border border-white/50 rounded-[10px] pl-9 pr-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms]" />
         </div>
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30">
+        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms]">
           <option value="">Todas categorias</option>
           {cats.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -1662,7 +1662,7 @@ function PaymentGatewaysPanel() {
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Client ID</label>
             <div className="relative">
-              <input type={showStone ? 'text' : 'password'} className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" value={stoneForm.client_id} onChange={e => setStoneForm(f => ({ ...f, client_id: e.target.value }))} />
+              <input type={showStone ? 'text' : 'password'} className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms]" value={stoneForm.client_id} onChange={e => setStoneForm(f => ({ ...f, client_id: e.target.value }))} />
               <button className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowStone(!showStone)}>
                 <Eye className="h-3.5 w-3.5" />
               </button>
@@ -1670,7 +1670,7 @@ function PaymentGatewaysPanel() {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Client Secret</label>
-            <input type="password" className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" value={stoneForm.client_secret} onChange={e => setStoneForm(f => ({ ...f, client_secret: e.target.value }))} />
+            <input type="password" className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms]" value={stoneForm.client_secret} onChange={e => setStoneForm(f => ({ ...f, client_secret: e.target.value }))} />
           </div>
         </div>
         <Button size="sm" onClick={() => toast.info('Integração Stone em desenvolvimento')}><Save className="h-3.5 w-3.5 mr-1.5" />Salvar</Button>
@@ -1699,7 +1699,7 @@ function PaymentGatewaysPanel() {
             {[{ label: 'App Key', field: 'app_key' }, { label: 'App Secret', field: 'app_secret' }, { label: 'ID da Conta OMIE', field: 'conta_id' }].map(({ label, field }) => (
               <div key={field}>
                 <label className="text-xs font-medium text-muted-foreground block mb-1">{label}</label>
-                <input type={field !== 'conta_id' ? 'password' : 'text'} className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" value={(omieForm as any)[field]} onChange={e => setOmieForm(f => ({ ...f, [field]: e.target.value }))} />
+                <input type={field !== 'conta_id' ? 'password' : 'text'} className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 focus:bg-white/80 transition-all duration-[220ms]" value={(omieForm as any)[field]} onChange={e => setOmieForm(f => ({ ...f, [field]: e.target.value }))} />
               </div>
             ))}
           </div>
@@ -1772,7 +1772,7 @@ export default function SettingsPage() {
       <div className="flex h-[calc(100vh-64px)] overflow-hidden">
 
         {/* Sidebar */}
-        <div className="w-56 border-r border-border bg-white overflow-y-auto flex-shrink-0">
+        <div className="w-56 border-r border-white/30 [background:var(--glass-bg-strong)] [backdrop-filter:blur(16px)] [-webkit-backdrop-filter:blur(16px)] overflow-y-auto flex-shrink-0">
           {/* User card */}
           <div className="p-3 border-b border-border">
             <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
@@ -1797,7 +1797,7 @@ export default function SettingsPage() {
                     onClick={() => setActive(key)}
                     className={cn(
                       'w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left text-xs font-medium transition-colors',
-                      active === key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      active === key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
                     )}
                   >
                     <Icon className="h-3.5 w-3.5 flex-shrink-0" />
@@ -1810,7 +1810,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-muted/20">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-4xl">
             <RenderPanel section={active} />
           </div>

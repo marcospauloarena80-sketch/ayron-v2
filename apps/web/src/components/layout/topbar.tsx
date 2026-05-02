@@ -51,7 +51,7 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
         <div className="p-5 space-y-4">
           {/* Avatar */}
           <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full bg-violet-600 flex items-center justify-center text-white font-black text-xl">
+            <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center text-white font-black text-xl">
               {form.name[0] ?? 'U'}
             </div>
             <div>
@@ -66,12 +66,12 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">Nome</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 transition-all duration-[220ms]" />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">E-mail</label>
               <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                className="w-full bg-white/60 border border-white/50 rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-[3px] focus:ring-primary/25 focus:border-primary/50 transition-all duration-[220ms]" />
             </div>
           </div>
 
@@ -80,14 +80,14 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
             <label className="flex items-center justify-between">
               <span className="text-sm text-gray-700">Notificações push</span>
               <button onClick={() => setPrefs(p => ({ ...p, notifications: !p.notifications }))}
-                className={cn('w-10 h-5 rounded-full transition-colors relative', prefs.notifications ? 'bg-violet-600' : 'bg-gray-200')}>
+                className={cn('w-10 h-5 rounded-full transition-colors relative', prefs.notifications ? 'bg-secondary' : 'bg-gray-200')}>
                 <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all', prefs.notifications ? 'left-5' : 'left-0.5')} />
               </button>
             </label>
             <label className="flex items-center justify-between">
               <span className="text-sm text-gray-700">Resumo por e-mail</span>
               <button onClick={() => setPrefs(p => ({ ...p, emailDigest: !p.emailDigest }))}
-                className={cn('w-10 h-5 rounded-full transition-colors relative', prefs.emailDigest ? 'bg-violet-600' : 'bg-gray-200')}>
+                className={cn('w-10 h-5 rounded-full transition-colors relative', prefs.emailDigest ? 'bg-secondary' : 'bg-gray-200')}>
                 <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all', prefs.emailDigest ? 'left-5' : 'left-0.5')} />
               </button>
             </label>
@@ -95,7 +95,7 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/30">
           <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-white/60">Cancelar</button>
-          <button onClick={handleSave} className="px-4 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700">Salvar</button>
+          <button onClick={handleSave} className="px-4 py-2 text-sm bg-secondary text-white rounded-[10px] hover:bg-secondary/90 transition-colors">Salvar</button>
         </div>
       </div>
     </div>
@@ -129,7 +129,7 @@ function PermissionsModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
-            <div className="h-10 w-10 rounded-full bg-violet-600 flex items-center justify-center text-white font-bold">
+            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-white font-bold">
               {user?.name?.[0]}
             </div>
             <div>
@@ -161,7 +161,7 @@ function PermissionsModal({ onClose }: { onClose: () => void }) {
                   <button key={role} onClick={() => switchRole(role)}
                     className={cn('border rounded-lg px-3 py-2 text-xs font-medium transition-colors',
                       user.role === role
-                        ? 'border-violet-500 bg-violet-50 text-violet-700'
+                        ? 'border-primary/40 bg-primary/10 text-primary'
                         : 'border-gray-200 text-gray-600 hover:border-gray-300')}>
                     {ROLE_LABELS[role]}
                   </button>

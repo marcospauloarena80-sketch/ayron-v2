@@ -89,7 +89,7 @@ export function AyronWidget() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/30"
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-2xl [background:var(--primary-gradient)] [box-shadow:0_4px_20px_rgba(255,106,0,0.45),0_0_0_1px_rgba(255,255,255,0.20)]"
         title="AYRON — Assistente Cognitivo"
       >
         <Brain className="h-6 w-6 text-white" />
@@ -107,7 +107,7 @@ export function AyronWidget() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="fixed bottom-24 right-6 z-50 w-96 rounded-2xl border border-border bg-white shadow-2xl overflow-hidden flex flex-col"
+            className="fixed bottom-24 right-6 z-50 w-96 rounded-2xl border border-white/40 [background:var(--glass-bg-strong)] [backdrop-filter:blur(20px)] [-webkit-backdrop-filter:blur(20px)] [box-shadow:0_24px_64px_rgba(0,0,0,0.15),0_4px_16px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col"
             style={{ maxHeight: '520px' }}
           >
             {/* Header */}
