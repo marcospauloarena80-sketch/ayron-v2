@@ -1,6 +1,6 @@
 'use client';
 export const dynamic = 'force-dynamic';
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { Topbar } from '@/components/layout/topbar';
@@ -863,12 +863,53 @@ const MOCK_LANCAMENTOS = [
   { id: 'L005', vencimento: '2026-04-20', descricao: 'Carlos Souza — Consulta VIP', valor: 1200, pago: 600, saldo: 600, controle: 'REC-3102', conta: 'Caixa Principal', filial: 'Principal', classificacao: 'Receita Clínica', tipo: 'RECEBER' },
 ];
 
+type FormData = {
+  descricao: string; valor: string; vencimento: string;
+  pago_em: string; classificacao: string; conta: string;
+  filial: string; forma_pagamento: string;
+};
+
+function LancamentoForm({
+  tipo,
+  formData,
+  setFormData,
+}: {
+  tipo: 'RECEITA' | 'DESPESA';
+  formData: FormData;
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Select label="Unidade/Filial" value={formData.filial} onChange={(e: any) => setFormData(p => ({ ...p, filial: e.target.value }))}>
+          <option>Principal</option><option>Filial 2</option>
+        </Select>
+        <Select label="Conta Corrente" value={formData.conta} onChange={(e: any) => setFormData(p => ({ ...p, conta: e.target.value }))}>
+          <option>Caixa Principal</option><option>Conta Corrente</option><option>Poupança</option>
+        </Select>
+      </div>
+      <Input label="Descrição *" placeholder={tipo === 'RECEITA' ? 'Descrição da receita...' : 'Descrição da despesa...'} value={formData.descricao} onChange={(e: any) => setFormData(p => ({ ...p, descricao: e.target.value }))} />
+      <div className="grid grid-cols-2 gap-3">
+        <Select label="Classificação" value={formData.classificacao} onChange={(e: any) => setFormData(p => ({ ...p, classificacao: e.target.value }))}>
+          <option>Receita Clínica</option><option>Despesa Fixa</option>
+          <option>Insumos</option><option>Marketing</option><option>Impostos</option><option>Outro</option>
+        </Select>
+        <Input label="Valor (R$) *" type="number" placeholder="0,00" value={formData.valor} onChange={(e: any) => setFormData(p => ({ ...p, valor: e.target.value }))} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="Vencimento *" type="date" value={formData.vencimento} onChange={(e: any) => setFormData(p => ({ ...p, vencimento: e.target.value }))} />
+        <Input label="Quitação" type="date" value={formData.pago_em} onChange={(e: any) => setFormData(p => ({ ...p, pago_em: e.target.value }))} />
+      </div>
+      <Select label="Forma de Pagamento" value={formData.forma_pagamento} onChange={(e: any) => setFormData(p => ({ ...p, forma_pagamento: e.target.value }))}>
+        <option>PIX</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Boleto</option>
+      </Select>
+      <p className="text-xs text-muted-foreground">Edição por: usuário atual</p>
+    </div>
+  );
+}
+
 function LancamentosTab() {
-  const [formData, setFormData] = useState<{
-    descricao: string; valor: string; vencimento: string;
-    pago_em: string; classificacao: string; conta: string;
-    filial: string; forma_pagamento: string;
-  }>({
+  const [formData, setFormData] = useState<FormData>({
     descricao: '', valor: '', vencimento: '', pago_em: '',
     classificacao: 'Receita Clínica', conta: 'Caixa Principal',
     filial: 'Principal', forma_pagamento: 'PIX',
@@ -902,7 +943,6 @@ function LancamentosTab() {
   });
 
   const queryClient = useQueryClient();
-  const [currentTipo, setCurrentTipo] = useState<'RECEBER' | 'PAGAR'>('RECEBER');
 
   const insertMutation = useMutation({
     mutationFn: (tipo: 'RECEBER' | 'PAGAR') =>
@@ -917,14 +957,14 @@ function LancamentosTab() {
         filial: formData.filial || undefined,
         forma_pagamento: formData.forma_pagamento || undefined,
       }),
-    onSuccess: () => {
-      toast.success(currentTipo === 'RECEBER' ? 'Receita lançada ✓' : 'Despesa lançada ✓');
+    onSuccess: (_data, tipo) => {
+      toast.success(tipo === 'RECEBER' ? 'Receita lançada ✓' : 'Despesa lançada ✓');
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       resetForm();
       setShowNovaReceita(false);
       setShowNovaDespesa(false);
     },
-    onError: (e: any) => toast.error(`Erro ao salvar: ${e.message}`),
+    onError: (e: any) => toast.error(`Erro ao salvar: ${e?.message ?? String(e)}`),
   });
 
   const filtered = lancamentosDB.filter((l: any) => {
@@ -936,34 +976,6 @@ function LancamentosTab() {
     return true;
   });
 
-  const LancamentoForm = ({ tipo, onClose }: { tipo: 'RECEITA' | 'DESPESA'; onClose: () => void }) => (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <Select label="Unidade/Filial" value={formData.filial} onChange={(e: any) => setFormData(p => ({ ...p, filial: e.target.value }))}>
-          <option>Principal</option><option>Filial 2</option>
-        </Select>
-        <Select label="Conta Corrente" value={formData.conta} onChange={(e: any) => setFormData(p => ({ ...p, conta: e.target.value }))}>
-          <option>Caixa Principal</option><option>Conta Corrente</option><option>Poupança</option>
-        </Select>
-      </div>
-      <Input label="Descrição *" placeholder={tipo === 'RECEITA' ? 'Descrição da receita...' : 'Descrição da despesa...'} value={formData.descricao} onChange={(e: any) => setFormData(p => ({ ...p, descricao: e.target.value }))} />
-      <div className="grid grid-cols-2 gap-3">
-        <Select label="Classificação" value={formData.classificacao} onChange={(e: any) => setFormData(p => ({ ...p, classificacao: e.target.value }))}>
-          <option>Receita Clínica</option><option>Despesa Fixa</option>
-          <option>Insumos</option><option>Marketing</option><option>Impostos</option><option>Outro</option>
-        </Select>
-        <Input label="Valor (R$) *" type="number" placeholder="0,00" value={formData.valor} onChange={(e: any) => setFormData(p => ({ ...p, valor: e.target.value }))} />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="Vencimento *" type="date" value={formData.vencimento} onChange={(e: any) => setFormData(p => ({ ...p, vencimento: e.target.value }))} />
-        <Input label="Quitação" type="date" value={formData.pago_em} onChange={(e: any) => setFormData(p => ({ ...p, pago_em: e.target.value }))} />
-      </div>
-      <Select label="Forma de Pagamento" value={formData.forma_pagamento} onChange={(e: any) => setFormData(p => ({ ...p, forma_pagamento: e.target.value }))}>
-        <option>PIX</option><option>Cartão</option><option>Dinheiro</option><option>Transferência</option><option>Boleto</option>
-      </Select>
-      <p className="text-xs text-muted-foreground">Edição por: usuário atual</p>
-    </div>
-  );
 
   return (
     <div className="space-y-4">
@@ -1003,8 +1015,8 @@ function LancamentosTab() {
 
       {/* Action buttons */}
       <div className="flex gap-2 flex-wrap">
-        <Button size="sm" onClick={() => setShowNovaReceita(true)}><Plus className="h-3.5 w-3.5 mr-1" />Nova Receita</Button>
-        <Button size="sm" variant="secondary" onClick={() => setShowNovaDespesa(true)}><TrendingDown className="h-3.5 w-3.5 mr-1" />Nova Despesa</Button>
+        <Button size="sm" onClick={() => { resetForm(); setShowNovaReceita(true); }}><Plus className="h-3.5 w-3.5 mr-1" />Nova Receita</Button>
+        <Button size="sm" variant="secondary" onClick={() => { resetForm(); setShowNovaDespesa(true); }}><TrendingDown className="h-3.5 w-3.5 mr-1" />Nova Despesa</Button>
         <Button size="sm" variant="secondary" disabled={!selected} onClick={() => selected && toast.info(`Editar ${selected.id}`)}><Edit2 className="h-3.5 w-3.5 mr-1" />Editar</Button>
         <Button size="sm" variant="secondary" disabled={!selected || selected?.pago >= selected?.valor}
           onClick={() => selected && setShowDefinirPago(true)}>
@@ -1061,12 +1073,12 @@ function LancamentosTab() {
 
       {/* Nova Receita */}
       <Dialog open={showNovaReceita} onClose={() => setShowNovaReceita(false)} title="Nova Receita" size="lg">
-        <LancamentoForm tipo="RECEITA" onClose={() => setShowNovaReceita(false)} />
+        <LancamentoForm tipo="RECEITA" formData={formData} setFormData={setFormData} />
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={() => setShowNovaReceita(false)}>Cancelar</Button>
           <Button
-            disabled={insertMutation.isPending || !formData.descricao || !formData.valor || !formData.vencimento}
-            onClick={() => { setCurrentTipo('RECEBER'); insertMutation.mutate('RECEBER'); }}
+            disabled={insertMutation.isPending || !formData.descricao || parseFloat(formData.valor || '0') <= 0 || !formData.vencimento}
+            onClick={() => insertMutation.mutate('RECEBER')}
           >
             {insertMutation.isPending ? 'Salvando...' : 'Salvar Receita'}
           </Button>
@@ -1075,12 +1087,12 @@ function LancamentosTab() {
 
       {/* Nova Despesa */}
       <Dialog open={showNovaDespesa} onClose={() => setShowNovaDespesa(false)} title="Nova Despesa" size="lg">
-        <LancamentoForm tipo="DESPESA" onClose={() => setShowNovaDespesa(false)} />
+        <LancamentoForm tipo="DESPESA" formData={formData} setFormData={setFormData} />
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={() => setShowNovaDespesa(false)}>Cancelar</Button>
           <Button
-            disabled={insertMutation.isPending || !formData.descricao || !formData.valor || !formData.vencimento}
-            onClick={() => { setCurrentTipo('PAGAR'); insertMutation.mutate('PAGAR'); }}
+            disabled={insertMutation.isPending || !formData.descricao || parseFloat(formData.valor || '0') <= 0 || !formData.vencimento}
+            onClick={() => insertMutation.mutate('PAGAR')}
           >
             {insertMutation.isPending ? 'Salvando...' : 'Salvar Despesa'}
           </Button>
