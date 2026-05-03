@@ -380,9 +380,6 @@ export default function AlertsPage() {
   const queryClient = useQueryClient();
   const [localAlerts, setLocalAlerts] = useState<AlertItem[]>([]);
 
-  useEffect(() => {
-    setLocalAlerts(alertsData as AlertItem[]);
-  }, [alertsData]);
   const [statusFilter, setStatusFilter] = useState<AlertStatus | ''>('OPEN');
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | ''>('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -390,14 +387,28 @@ export default function AlertsPage() {
   const [running, setRunning] = useState(false);
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => updateAlertStatus(id, status),
+    mutationFn: ({ id, status, snoozed_until }: { id: string; status: string; snoozed_until?: string }) =>
+      updateAlertStatus(id, status as any, snoozed_until),
+    onMutate: ({ id, status, snoozed_until }) => {
+      const previous = localAlerts;
+      setLocalAlerts(prev => prev.map(a =>
+        a.id === id
+          ? { ...a, status: status as AlertStatus, ...(snoozed_until ? { snoozed_until } : {}) }
+          : a
+      ));
+      return { previous };
+    },
+    onError: (e: any, _vars, context: any) => {
+      if (context?.previous) setLocalAlerts(context.previous);
+      toast.error(`Erro: ${e?.message ?? String(e)}`);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
-    onError: (e: any) => toast.error(`Erro: ${e?.message ?? String(e)}`),
   });
 
   const newAlertMutation = useMutation({
     mutationFn: (data: Parameters<typeof insertAlert>[0]) => insertAlert(data),
-    onSuccess: () => {
+    onSuccess: (newAlert) => {
+      setLocalAlerts(prev => [newAlert, ...prev]);
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
       toast.success('Alerta criado');
       setShowNovoAlerta(false);
@@ -405,12 +416,15 @@ export default function AlertsPage() {
     onError: (e: any) => toast.error(`Erro ao criar alerta: ${e?.message ?? String(e)}`),
   });
 
+  useEffect(() => {
+    if (!statusMutation.isPending && !newAlertMutation.isPending) {
+      setLocalAlerts(alertsData as AlertItem[]);
+    }
+  }, [alertsData, statusMutation.isPending, newAlertMutation.isPending]);
+
   const handleUpdate = (id: string, changes: Partial<AlertItem>) => {
-    // Optimistic update for instant UI response
-    setLocalAlerts(prev => prev.map(a => a.id === id ? { ...a, ...changes } : a));
-    // Persist status changes to Supabase
     if (changes.status) {
-      statusMutation.mutate({ id, status: changes.status });
+      statusMutation.mutate({ id, status: changes.status, snoozed_until: (changes as any).snoozed_until });
     }
   };
 

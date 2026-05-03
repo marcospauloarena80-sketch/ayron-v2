@@ -558,11 +558,17 @@ export async function fetchAlerts(): Promise<any[]> {
   }));
 }
 
-export async function updateAlertStatus(id: string, status: string): Promise<void> {
+export async function updateAlertStatus(
+  id: string,
+  status: 'OPEN' | 'ACKNOWLEDGED' | 'SNOOZED' | 'RESOLVED' | 'DISMISSED',
+  snoozed_until?: string,
+): Promise<void> {
   const supabase = createClient();
+  const payload: Record<string, any> = { status, updated_at: new Date().toISOString() };
+  if (snoozed_until) payload.snoozed_until = snoozed_until;
   const { error } = await supabase
     .from('alerts')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(payload)
     .eq('id', id);
   if (error) throw error;
 }
