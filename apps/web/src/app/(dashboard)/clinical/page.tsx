@@ -30,6 +30,9 @@ import {
   Scale, Clipboard, Mic, MicOff, Upload, Link2, ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BriefingCard } from '@/components/clinical/briefing-card';
+import { PreConsultaPanel } from '@/components/clinical/pre-consulta-panel';
+import { ConsultaIATab } from '@/components/clinical/consulta-ia-tab';
 
 // ── Mock patients for prontuário hub ──────────────────────────────────────────
 
@@ -571,7 +574,7 @@ function ImportExameModal({ open, onClose, onSave }: { open: boolean; onClose: (
 
 function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => void }) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'evolucoes' | 'anamnese' | 'receitas' | 'exames' | 'ia' | 'imagens' | 'telemedicina' | 'bioimpedancia'>('evolucoes');
+  const [activeTab, setActiveTab] = useState<'evolucoes' | 'anamnese' | 'receitas' | 'exames' | 'ia' | 'imagens' | 'telemedicina' | 'bioimpedancia' | 'consulta_ia'>('evolucoes');
   const [showEmailProntuario, setShowEmailProntuario] = useState(false);
   const [showNewEvolucao, setShowNewEvolucao] = useState(false);
   const [editingAnamnese, setEditingAnamnese] = useState(false);
@@ -657,6 +660,7 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
     { key: 'ia', label: 'AYRON IA', icon: Brain },
     { key: 'imagens', label: 'Imagens', icon: Image },
     { key: 'telemedicina', label: 'Telemedicina', icon: Video },
+    { key: 'consulta_ia', label: '🎤 Consulta IA', icon: Sparkles },
   ];
 
   const riskColors: Record<string, string> = { LOW: 'text-green-600 bg-green-100', MEDIUM: 'text-amber-600 bg-amber-100', HIGH: 'text-red-600 bg-red-100' };
@@ -701,6 +705,15 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
               <Plus className="h-3.5 w-3.5 mr-1.5" />Nova Evolução
             </Button>
           </div>
+        </div>
+
+        {/* ── Briefing + Pré-consulta ───────────────────────────────── */}
+        <div className="space-y-3 mb-4">
+          <BriefingCard
+            patientId={patient.id}
+            onOpenEvolution={() => setActiveTab('evolucoes')}
+          />
+          <PreConsultaPanel patientId={patient.id} />
         </div>
 
         {/* Tab bar */}
@@ -1332,6 +1345,25 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
             </div>
           );
         })()}
+
+        {activeTab === 'consulta_ia' && (
+          <ConsultaIATab
+            patientId={patient.id}
+            patientName={patient.name}
+            onFillEvolution={(data: any) => {
+              setNewEvolucao(v => ({ ...v, ...data }));
+              setShowNewEvolucao(true);
+              setActiveTab('evolucoes');
+            }}
+            onFillAnamnese={(data: any) => {
+              setAnamneseData(v => ({ ...v, ...data }));
+              setEditingAnamnese(true);
+              setActiveTab('anamnese');
+            }}
+            onOpenReceita={() => { setShowNovaReceita(true); setActiveTab('receitas'); }}
+            onOpenExame={() => { setShowSolicitarExame(true); setActiveTab('exames'); }}
+          />
+        )}
       </div>
       <EmailProntuarioModal open={showEmailProntuario} onClose={() => setShowEmailProntuario(false)} />
       <PrintCenterModal open={showPrintCenter} onClose={() => setShowPrintCenter(false)} patientName={patient.name} />
