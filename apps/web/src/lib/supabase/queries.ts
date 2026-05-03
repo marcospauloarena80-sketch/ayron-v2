@@ -558,6 +558,44 @@ export async function fetchAlerts(): Promise<any[]> {
   }));
 }
 
+export async function updateAlertStatus(id: string, status: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('alerts')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function insertAlert(data: {
+  title: string;
+  description?: string;
+  type: string;
+  severity: string;
+  patient_id?: string;
+  due_date?: string;
+}): Promise<any> {
+  const supabase = createClient();
+  const { data: row, error } = await supabase
+    .from('alerts')
+    .insert({ ...data, status: 'OPEN' })
+    .select('*, patients(id, full_name)')
+    .single();
+  if (error) throw error;
+  return {
+    id: row.id,
+    title: row.title,
+    message: row.description ?? '',
+    severity: row.severity,
+    status: row.status,
+    category: (row.type ?? 'CLINICO').toLowerCase(),
+    rationale: [],
+    suggested_actions: suggestedActionsForType(row.type),
+    patient: row.patients ? { id: row.patients.id, full_name: row.patients.full_name } : undefined,
+    created_at: row.created_at,
+  };
+}
+
 // ── Appointments mutations ────────────────────────────────────────────────────
 
 export async function insertAppointment(data: {

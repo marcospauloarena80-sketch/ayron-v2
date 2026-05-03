@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { fetchAlerts } from '@/lib/supabase/queries';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchAlerts, updateAlertStatus, insertAlert } from '@/lib/supabase/queries';
 import { Topbar } from '@/components/layout/topbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -377,6 +377,7 @@ export default function AlertsPage() {
     queryFn: () => fetchAlerts().catch(() => INITIAL_ALERTS),
     staleTime: 30_000,
   });
+  const queryClient = useQueryClient();
   const [localAlerts, setLocalAlerts] = useState<AlertItem[]>([]);
 
   useEffect(() => {
@@ -388,12 +389,39 @@ export default function AlertsPage() {
   const [showNovoAlerta, setShowNovoAlerta] = useState(false);
   const [running, setRunning] = useState(false);
 
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => updateAlertStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+    onError: (e: any) => toast.error(`Erro: ${e?.message ?? String(e)}`),
+  });
+
+  const newAlertMutation = useMutation({
+    mutationFn: (data: Parameters<typeof insertAlert>[0]) => insertAlert(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      toast.success('Alerta criado');
+      setShowNovoAlerta(false);
+    },
+    onError: (e: any) => toast.error(`Erro ao criar alerta: ${e?.message ?? String(e)}`),
+  });
+
   const handleUpdate = (id: string, changes: Partial<AlertItem>) => {
+    // Optimistic update for instant UI response
     setLocalAlerts(prev => prev.map(a => a.id === id ? { ...a, ...changes } : a));
+    // Persist status changes to Supabase
+    if (changes.status) {
+      statusMutation.mutate({ id, status: changes.status });
+    }
   };
 
   const handleSaveAlerta = (a: AlertItem) => {
-    setLocalAlerts(prev => [a, ...prev]);
+    newAlertMutation.mutate({
+      title: a.title,
+      description: a.message,
+      type: (a.category ?? 'CLINICO').toUpperCase(),
+      severity: a.severity,
+      patient_id: a.patient?.id,
+    });
   };
 
   const runEngine = () => {
