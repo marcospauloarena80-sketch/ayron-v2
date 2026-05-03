@@ -14,7 +14,7 @@ export interface BriefingData {
   activePrescriptions: Array<{
     id: string;
     date: string;
-    validade: string;
+    validade: string | null;
     items: Array<{ med: string; dosagem: string }>;
     isExpired: boolean;
   }>;
@@ -53,6 +53,10 @@ export async function fetchPatientBriefing(patientId: string): Promise<BriefingD
       .limit(5),
   ]);
 
+  if (evolResult.error) throw evolResult.error;
+  if (prescResult.error) throw prescResult.error;
+  if (examResult.error) throw examResult.error;
+
   const now = new Date();
 
   const lastEv = evolResult.data;
@@ -61,6 +65,7 @@ export async function fetchPatientBriefing(patientId: string): Promise<BriefingD
         id: lastEv.id,
         date: lastEv.date,
         type: lastEv.type,
+        // Supabase join types don't model ad-hoc .select() strings — any cast intentional
         medico: (lastEv as any).professionals?.name ?? 'Desconhecido',
         subjetivo: lastEv.subjetivo ?? '',
         plano: lastEv.plano ?? '',
@@ -81,5 +86,5 @@ export async function fetchPatientBriefing(patientId: string): Promise<BriefingD
     (e: any) => e.status === 'PENDING' || e.status === 'SOLICITADO',
   );
 
-  return { lastEvolution, activePrescriptions, pendingExams, activeProtocolTags: [] };
+  return { lastEvolution, activePrescriptions, pendingExams, activeProtocolTags: [] }; // TODO: implement in sprint 2 from patient_protocol_tags table
 }
