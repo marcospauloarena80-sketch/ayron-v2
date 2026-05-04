@@ -17,6 +17,7 @@ import {
 import { getPatientPendingFlags } from '@/lib/patient-pending-flags';
 import { birthdayExportService, type PatientBirthdayRow } from '@/lib/birthday-export-service';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
 import { fetchPatients, fetchAllPatients } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
@@ -45,6 +46,8 @@ interface Filters {
   mala_direta: string;
   aniversariante: string;
   status: string;
+  origem: string;
+  indicado_por: string;
 }
 
 // ── Status configs ────────────────────────────────────────────────────────────
@@ -70,7 +73,26 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const TAG_LABELS: Record<string, string> = {
   GELADEIRA: 'Geladeira', FROZEN: 'Frozen', DIAMANTE: 'Diamante', APENAS_CONSULTA: 'Só Consulta',
+  EMBAIXADOR: '⭐ Embaixador', RESTRICAO: '🚫 Restrição', PACIENTE_DIFICIL: '⚠️ P. Difícil',
+  VIP_PLUS: 'VIP+', RISCO_EVASAO: 'Risco Evasão',
 };
+
+const ORIGEM_LABELS: Record<string, string> = {
+  'Instagram': '📸 Instagram', 'WhatsApp': '💬 WhatsApp', 'Indicação': '🤝 Indicação',
+  'Tráfego Pago': '💰 Tráfego Pago', 'Presencial': '🏢 Presencial',
+  'Email': '📧 Email', 'Facebook': '📘 Facebook',
+  'Internet': '🌐 Internet', 'Palestra': '🎤 Palestra', 'Propaganda': '📢 Propaganda',
+  'Outros': '📋 Outros', 'Outro': '📋 Outro',
+};
+
+function getReturnRisk(p: any): { label: string; color: string } | null {
+  const days = p.days_absent ?? 0;
+  if (p.current_status === 'INATIVO') return null; // handled separately
+  if (days >= 90) return { label: '🔴 Alto Risco', color: 'bg-red-100 text-red-700' };
+  if (days >= 60) return { label: '🟡 Médio Risco', color: 'bg-amber-100 text-amber-700' };
+  if (days >= 30) return { label: '🟢 Baixo Risco', color: 'bg-green-100 text-green-700' };
+  return null;
+}
 
 const PAGE_SIZE = 30;
 
@@ -211,6 +233,9 @@ function PatientCard({
   onSMSClick,
   onQuestionariosClick,
   onImprimirClick,
+  onEditClick,
+  onIndicadoPorFilter,
+  hasManagerAccess,
 }: {
   patient: any;
   onClick: () => void;
@@ -219,6 +244,9 @@ function PatientCard({
   onSMSClick: (p: any) => void;
   onQuestionariosClick: (p: any) => void;
   onImprimirClick: (p: any) => void;
+  onEditClick: (p: any) => void;
+  onIndicadoPorFilter: (nome: string) => void;
+  hasManagerAccess: boolean;
 }) {
   const router = useRouter();
   const moreActionsRef = useRef<HTMLDivElement>(null);
@@ -226,6 +254,7 @@ function PatientCard({
   const isInativo = patient.current_status === 'INATIVO';
   const isAgendado = ['AGENDADO', 'CONFIRMADO'].includes(patient.current_status);
   const isNotScheduled = ['AGUARDANDO_AGENDAMENTO', 'NOVA_LEAD'].includes(patient.current_status);
+  const isActiveWithoutNextAppointment = !isInativo && !isNotScheduled && !patient.next_appointment_date && isAgendado === false;
   const flags = getPatientPendingFlags(patient);
 
   useEffect(() => {
@@ -300,17 +329,25 @@ function PatientCard({
       {/* Header */}
       <div className="flex items-start justify-between mb-3 pr-4">
         <div className="flex items-center gap-2">
+          {/* Status dot */}
           <span className="relative group flex h-2.5 w-2.5 flex-shrink-0 mt-0.5">
             <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_COLORS[patient.current_status] ?? 'bg-gray-300'}`} />
             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex items-center whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white shadow-lg z-10">
               {STATUS_LABELS[patient.current_status] ?? patient.current_status}
             </span>
           </span>
+          {/* Photo avatar or initials */}
+          <div className="h-8 w-8 rounded-full overflow-hidden flex-shrink-0 bg-primary/10 flex items-center justify-center">
+            {patient.photo_url
+              ? <img src={patient.photo_url} alt={patient.full_name} className="h-full w-full object-cover" />
+              : <span className="text-[10px] font-bold text-primary">{(patient.full_name ?? '?').split(' ').map((n: string) => n[0]).slice(0, 2).join('')}</span>
+            }
+          </div>
           <div>
             <p className="font-semibold text-sm">{patient.full_name}</p>
             {age !== null && (
               <p className="text-xs text-muted-foreground">
-                {age} anos · {patient.sex === 'F' ? 'Feminino' : patient.sex === 'M' ? 'Masculino' : patient.sex}
+                {age} anos · {patient.sex === 'F' ? 'Feminino' : patient.sex === 'M' ? 'Masculino' : patient.sex ?? '—'}
               </p>
             )}
           </div>
@@ -354,28 +391,67 @@ function PatientCard({
         </div>
       )}
 
-      {/* Tags */}
+      {/* Tags + Risk + Meta */}
       <div className="mt-2 flex gap-1 flex-wrap">
-        {patient.tier && patient.tier !== 'BRONZE' && (
+        {patient.tier && (
           <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full',
             patient.tier === 'DIAMANTE' ? 'bg-cyan-100 text-cyan-700' :
             patient.tier === 'PLATINA' ? 'bg-purple-100 text-purple-700' :
             patient.tier === 'VIP' ? 'bg-amber-100 text-amber-700' :
             patient.tier === 'GOLD' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-gray-100 text-gray-600')}>
+            patient.tier === 'SILVER' ? 'bg-gray-100 text-gray-500' :
+            'bg-orange-50 text-orange-600')}>
             {patient.tier}
           </span>
         )}
-        {patient.tags?.map((t: string) => (
-          <Badge key={t} variant="warning" className="text-[10px]">{TAG_LABELS[t] ?? t}</Badge>
-        ))}
-        {patient.days_absent >= 60 && patient.days_absent < 180 && patient.current_status !== 'INATIVO' && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">Em risco</span>
-        )}
+        {(() => { const risk = getReturnRisk(patient); return risk ? <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${risk.color}`}>{risk.label}</span> : null; })()}
+        {patient.tags?.map((t: string) => {
+          const tagColor =
+            t === 'EMBAIXADOR' ? 'bg-green-100 text-green-700 border-green-200' :
+            t === 'RESTRICAO' ? 'bg-red-100 text-red-700 border-red-200' :
+            t === 'PACIENTE_DIFICIL' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+            t === 'GELADEIRA' || t === 'FROZEN' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+            t === 'RISCO_EVASAO' ? 'bg-red-50 text-red-600 border-red-100' :
+            'bg-amber-50 text-amber-700 border-amber-200';
+          return (
+            <span key={t} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${tagColor}`}>
+              {TAG_LABELS[t] ?? t}
+            </span>
+          );
+        })}
         {patient.mala_direta && (
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">📨</span>
         )}
+        {patient.conheceu_por && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+            {ORIGEM_LABELS[patient.conheceu_por] ?? patient.conheceu_por}
+          </span>
+        )}
       </div>
+      {/* Indicado por + LTV */}
+      {(patient.indicado_por || (hasManagerAccess && patient.ltv)) && (
+        <div className="mt-1 flex gap-3 flex-wrap">
+          {patient.indicado_por && (
+            <button
+              onClick={e => { e.stopPropagation(); onIndicadoPorFilter(patient.indicado_por); }}
+              title={`Ver pacientes indicados por ${patient.indicado_por}`}
+              className="text-[10px] text-muted-foreground hover:text-primary transition-colors text-left"
+            >
+              🤝 Indicado por: <span className="text-primary font-medium underline-offset-2 hover:underline">{patient.indicado_por}</span>
+            </button>
+          )}
+          {hasManagerAccess && patient.ltv && (
+            <p className="text-[10px] text-muted-foreground">💰 LTV: <span className="text-foreground font-medium">R$ {Number(patient.ltv).toLocaleString('pt-BR')}</span></p>
+          )}
+        </div>
+      )}
+      {/* Sem próxima consulta — active patients without next appointment */}
+      {isActiveWithoutNextAppointment && (
+        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-600">
+          <Calendar className="h-3 w-3" />
+          Sem próxima consulta
+        </div>
+      )}
 
       {/* Quick action buttons — 4 main + more-actions menu */}
       <div className="mt-3 pt-3 border-t border-border flex gap-1" onClick={e => e.stopPropagation()}>
@@ -422,7 +498,11 @@ function PatientCard({
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
           {moreActionsOpen && (
-            <div className="absolute right-0 bottom-full mb-1 z-20 w-36 rounded-xl border border-border bg-white shadow-lg py-1">
+            <div className="absolute right-0 bottom-full mb-1 z-20 w-44 rounded-xl border border-border bg-white shadow-lg py-1">
+              <button onClick={e => { e.stopPropagation(); onEditClick(patient); setMoreActionsOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                <User className="h-3.5 w-3.5 text-muted-foreground" />Editar cadastro
+              </button>
+              <div className="my-1 border-t border-border/50" />
               <button onClick={e => { e.stopPropagation(); onEmailClick(patient); setMoreActionsOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
                 <Mail className="h-3.5 w-3.5 text-muted-foreground" />Email
               </button>
@@ -435,6 +515,15 @@ function PatientCard({
               <button onClick={e => { e.stopPropagation(); onImprimirClick(patient); setMoreActionsOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
                 <Printer className="h-3.5 w-3.5 text-muted-foreground" />Imprimir
               </button>
+              <div className="my-1 border-t border-border/50" />
+              <button onClick={e => { e.stopPropagation(); router.push(`/patients/${patient.id}`); setMoreActionsOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />Ver timeline
+              </button>
+              {isInativo && hasManagerAccess && (
+                <button onClick={e => { e.stopPropagation(); onInativoClick(patient); setMoreActionsOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors">
+                  <CheckCircle2 className="h-3.5 w-3.5" />Reativar paciente
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -443,7 +532,7 @@ function PatientCard({
   );
 }
 
-const EMPTY_FILTERS: Filters = { sexo: '', tier: '', retorno: '', tag: '', tipo_contato: '', mala_direta: '', aniversariante: '', status: '' };
+const EMPTY_FILTERS: Filters = { sexo: '', tier: '', retorno: '', tag: '', tipo_contato: '', mala_direta: '', aniversariante: '', status: '', origem: '', indicado_por: '' };
 
 // ── Email Modal ───────────────────────────────────────────────────────────────
 
@@ -817,6 +906,9 @@ export default function PatientsPage() {
   const [questionariosPatient, setQuestionariosPatient] = useState<any>(null);
   const [imprimirPatient, setImprimirPatient] = useState<any>(null);
   const router = useRouter();
+  const [editPatient, setEditPatient] = useState<any>(null);
+  const user = useAuthStore(s => s.user);
+  const hasManagerAccess = user?.role === 'MASTER' || user?.role === 'ADMIN' || user?.role === 'GERENTE';
 
   const { data, isLoading } = useQuery({
     queryKey: ['patients', search, page],
@@ -847,7 +939,7 @@ export default function PatientsPage() {
 
   let patients = apiPatients.filter((p: any) => {
     const s = search.toLowerCase();
-    if (s && !p.full_name?.toLowerCase().includes(s) && !p.phone?.includes(s)) return false;
+    if (s && !p.full_name?.toLowerCase().includes(s) && !p.phone?.includes(s) && !p.cpf?.replace(/\D/g,'').includes(s.replace(/\D/g,'')) && !p.email?.toLowerCase().includes(s)) return false;
     if (filters.sexo && p.sex !== filters.sexo) return false;
     if (filters.tier && p.tier !== filters.tier) return false;
     if (filters.tag && !p.tags?.includes(filters.tag)) return false;
@@ -859,6 +951,8 @@ export default function PatientsPage() {
     if (filters.retorno === 'PERDENDO' && (p.days_absent < 90 || p.days_absent >= 180)) return false;
     if (filters.retorno === 'SEM_RETORNO' && p.days_absent < 180) return false;
     if (filters.status && p.current_status !== filters.status) return false;
+    if (filters.origem && p.conheceu_por !== filters.origem) return false;
+    if (filters.indicado_por && !p.indicado_por?.toLowerCase().includes(filters.indicado_por.toLowerCase())) return false;
     if (quickFilter === 'VIP' && !['DIAMANTE','PLATINA','VIP'].includes(p.tier)) return false;
     if (quickFilter === 'EM_RISCO' && p.days_absent < 60) return false;
     if (quickFilter === 'INATIVO' && p.current_status !== 'INATIVO') return false;
@@ -1049,6 +1143,29 @@ export default function PatientsPage() {
                   🎂 Deste mês ({aniversariantesCount})
                 </button>
               </div>
+
+              {/* Origem */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">Origem</p>
+                <select value={filters.origem} onChange={e => setFilter('origem', e.target.value)}
+                  className="w-full px-2 py-1.5 rounded-lg border border-border text-xs bg-white outline-none focus:border-primary">
+                  <option value="">Todas</option>
+                  {['Instagram','WhatsApp','Indicação','Tráfego Pago','Presencial','Email','Facebook','Internet','Palestra','Propaganda','Outros'].map(o => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Indicado por */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">Indicado por</p>
+                <input
+                  value={filters.indicado_por}
+                  onChange={e => setFilters(f => ({ ...f, indicado_por: e.target.value }))}
+                  placeholder="Nome do indicador..."
+                  className="w-full px-2 py-1.5 rounded-lg border border-border text-xs bg-white outline-none focus:border-primary"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-border">
@@ -1118,6 +1235,9 @@ export default function PatientsPage() {
                 onSMSClick={setSmsPatient}
                 onQuestionariosClick={setQuestionariosPatient}
                 onImprimirClick={setImprimirPatient}
+                onEditClick={setEditPatient}
+                onIndicadoPorFilter={nome => setFilters(f => ({ ...f, indicado_por: nome }))}
+                hasManagerAccess={hasManagerAccess}
               />
             ))}
           </div>
@@ -1130,6 +1250,7 @@ export default function PatientsPage() {
         onClose={() => setBirthdayModalOpen(false)}
       />
       <NewPatientModal open={newPatientOpen} onClose={() => setNewPatientOpen(false)} />
+      <NewPatientModal open={!!editPatient} onClose={() => setEditPatient(null)} patient={editPatient} />
       <ReactivationModal
         patient={campaignPatient}
         open={!!campaignPatient}

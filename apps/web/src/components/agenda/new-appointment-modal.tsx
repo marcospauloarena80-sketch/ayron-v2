@@ -15,6 +15,10 @@ const TYPE_LABELS: Record<string, string> = {
   EVALUATION: 'Avaliação', TELECONSULTATION: 'Teleconsulta', EXAM_REVIEW: 'Revisão de Exames',
 };
 
+const PROCEDURE_SUBTYPES = [
+  'Soroterapia', 'Implante', 'Injetável', 'Coleta', 'Teste Genético', 'Bioimpedância', 'Outros',
+];
+
 function SearchField<T>({
   label, icon: Icon, placeholder, value, display, onSearch, onSelect, results, renderResult, required,
 }: {
@@ -158,6 +162,7 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [procedureSubtype, setProcedureSubtype] = useState('');
   const [recDays, setRecDays] = useState<number[]>([]);
   const [recMonths, setRecMonths] = useState(1);
 
@@ -224,7 +229,7 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
       setPatient(preselectedPatient ?? null);
       setProfessional(null); setService(null);
       setType('CONSULTATION'); setDate(format(new Date(), 'yyyy-MM-dd'));
-      setSelectedSlot(null); setNotes('');
+      setSelectedSlot(null); setNotes(''); setProcedureSubtype('');
       setPatientQuery(''); setProfessionalQuery(''); setServiceQuery('');
       setRecDays([]); setRecMonths(1);
       setShowInlineCreate(false); setInlineName(''); setInlinePhone('');
@@ -250,7 +255,7 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
           type,
           start_time: start.toISOString(),
           end_time: end.toISOString(),
-          notes: notes || undefined,
+          notes: [procedureSubtype ? `[${procedureSubtype}]` : '', notes].filter(Boolean).join(' ') || undefined,
         };
       };
 
@@ -421,7 +426,7 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo *</label>
             <select
               className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              value={type} onChange={e => setType(e.target.value)}>
+              value={type} onChange={e => { setType(e.target.value); setProcedureSubtype(''); }}>
               {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -436,6 +441,21 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
             />
           </div>
         </div>
+
+        {type === 'PROCEDURE' && (
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Subtipo de Procedimento</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {PROCEDURE_SUBTYPES.map(s => (
+                <button key={s} type="button"
+                  onClick={() => setProcedureSubtype(prev => prev === s ? '' : s)}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${procedureSubtype === s ? 'bg-primary text-white border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {professional && date && (
           <div>

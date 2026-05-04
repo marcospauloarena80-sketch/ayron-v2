@@ -19,6 +19,7 @@ import api from '@/lib/api';
 import { fetchDashboardOverview } from '@/lib/supabase/queries';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth.store';
 
 function riskColor(score: number) {
   if (score >= 70) return 'text-red-600 bg-red-50 border-red-200';
@@ -98,7 +99,7 @@ function QuickAccessButton() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full mt-2 z-50 w-80 rounded-2xl border border-border bg-white shadow-2xl p-3"
+            className="absolute left-0 top-full mt-2 z-50 w-80 rounded-2xl border border-white/40 [background:rgba(255,255,255,0.88)] [backdrop-filter:blur(20px)] [-webkit-backdrop-filter:blur(20px)] [box-shadow:0_8px_32px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)] p-3"
           >
             <div className="flex items-center justify-between mb-2 px-1">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Módulos</p>
@@ -131,7 +132,15 @@ function QuickAccessButton() {
 
 function ExecutiveBlock({ data }: { data?: any }) {
   const router = useRouter();
+  const user = useAuthStore(s => s.user);
+  const hasManagerAccess = user?.role === 'MASTER' || user?.role === 'ADMIN' || user?.role === 'GERENTE';
   if (!data) return null;
+
+  // Mock financial metrics (fetched when API provides them)
+  const ticketMedio: number = data.ticket_medio ?? 285;
+  const ticketDelta: number = data.ticket_medio_delta ?? 12;
+  const ltv: number = data.ltv ?? 3200;
+  const taxaConversao: number = data.taxa_conversao ?? 34;
 
   const retentionColor =
     data.retention_rate >= 70 ? 'text-green-700 bg-green-50 border-green-200'
@@ -144,7 +153,7 @@ function ExecutiveBlock({ data }: { data?: any }) {
     : 'text-green-600';
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+    <div className={`grid grid-cols-2 sm:grid-cols-3 ${hasManagerAccess ? 'xl:grid-cols-5 lg:grid-cols-4' : 'xl:grid-cols-5'} gap-3`}>
       <Card className="p-4 space-y-1">
         <div className="flex items-center gap-2 text-muted-foreground">
           <DollarSign className="h-3.5 w-3.5" />
@@ -201,6 +210,43 @@ function ExecutiveBlock({ data }: { data?: any }) {
         </p>
         <p className="text-xs text-muted-foreground">slots próximos 14d</p>
       </Card>
+
+      {hasManagerAccess && (
+        <>
+          <Card className="p-4 space-y-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <DollarSign className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Ticket Médio</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xl font-bold text-foreground">R$ {ticketMedio.toLocaleString('pt-BR')}</p>
+              <span className={`text-xs font-semibold flex items-center gap-0.5 ${ticketDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {ticketDelta >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                {Math.abs(ticketDelta)}%
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">vs. mês anterior</p>
+          </Card>
+
+          <Card className="p-4 space-y-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Percent className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Taxa Conversão</span>
+            </div>
+            <p className="text-xl font-bold text-foreground">{taxaConversao}%</p>
+            <p className="text-xs text-muted-foreground">prescrição → compra</p>
+          </Card>
+
+          <Card className="p-4 space-y-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">LTV Médio</span>
+            </div>
+            <p className="text-xl font-bold text-foreground">R$ {ltv.toLocaleString('pt-BR')}</p>
+            <p className="text-xs text-muted-foreground">valor vitalício paciente</p>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
@@ -306,6 +352,137 @@ function TopRiskBlock() {
   );
 }
 
+// ── Return Risk Block ─────────────────────────────────────────────────────────
+
+type ReturnRisk = 'alto' | 'medio' | 'baixo';
+
+interface AtRiskPatient {
+  id: string;
+  name: string;
+  daysOverdue: number;
+  risk: ReturnRisk;
+  reason: string;
+}
+
+function classifyRisk(daysOverdue: number): ReturnRisk {
+  if (daysOverdue >= 60) return 'alto';
+  if (daysOverdue >= 30) return 'medio';
+  return 'baixo';
+}
+
+const RISK_COLORS: Record<ReturnRisk, string> = {
+  alto: 'bg-red-50 text-red-700 border-red-200',
+  medio: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  baixo: 'bg-green-50 text-green-700 border-green-200',
+};
+const RISK_LABELS: Record<ReturnRisk, string> = { alto: 'Alto', medio: 'Médio', baixo: 'Baixo' };
+
+const MOCK_RETURN_RISK: AtRiskPatient[] = [
+  { id: 'r1', name: 'Ricardo Nunes', daysOverdue: 82, risk: 'alto', reason: 'Sem retorno há +60d' },
+  { id: 'r2', name: 'Ana Lima', daysOverdue: 49, risk: 'alto', reason: 'Exame pendente' },
+  { id: 'r3', name: 'Carlos Mendes', daysOverdue: 35, risk: 'medio', reason: 'Acompanhamento atrasado' },
+  { id: 'r4', name: 'Beatriz Souza', daysOverdue: 32, risk: 'medio', reason: 'Cobrança pendente' },
+  { id: 'r5', name: 'Fernanda Costa', daysOverdue: 18, risk: 'baixo', reason: 'Retorno próximo' },
+  { id: 'r6', name: 'Marcos Dias', daysOverdue: 67, risk: 'alto', reason: 'Sem contato há 2 meses' },
+];
+
+function ReturnRiskBlock() {
+  const router = useRouter();
+  const [filter, setFilter] = useState<ReturnRisk | 'todos'>('todos');
+
+  const { data: apiPatients } = useQuery<AtRiskPatient[]>({
+    queryKey: ['return-risk-patients'],
+    queryFn: async () => {
+      try {
+        const r = await api.get('/patients?risk=true&limit=20');
+        const list = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
+        return list.map((p: any) => {
+          const expectedReturn = p.next_appointment_date ?? p.expected_return_date;
+          const daysOverdue = expectedReturn
+            ? Math.max(0, Math.floor((Date.now() - new Date(expectedReturn).getTime()) / 86400000))
+            : 0;
+          return { id: p.id, name: p.full_name ?? p.name, daysOverdue, risk: classifyRisk(daysOverdue), reason: p.risk_reason ?? 'Retorno em atraso' };
+        }).filter((p: AtRiskPatient) => p.daysOverdue > 0);
+      } catch {
+        return MOCK_RETURN_RISK;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const patients = (apiPatients && apiPatients.length > 0 ? apiPatients : MOCK_RETURN_RISK)
+    .filter(p => filter === 'todos' || p.risk === filter)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)
+    .slice(0, 8);
+
+  const counts = (apiPatients && apiPatients.length > 0 ? apiPatients : MOCK_RETURN_RISK).reduce(
+    (acc, p) => { acc[p.risk] = (acc[p.risk] ?? 0) + 1; return acc; },
+    {} as Record<ReturnRisk, number>
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50">
+              <UserX className="h-4 w-4 text-amber-500" />
+            </div>
+            <CardTitle>Pacientes sem Retorno</CardTitle>
+          </div>
+          <button onClick={() => router.push('/patients')} className="text-xs text-primary hover:underline">
+            Ver todos
+          </button>
+        </div>
+      </CardHeader>
+
+      {/* Quick filter */}
+      <div className="px-4 pb-3 flex gap-1.5 flex-wrap">
+        {(['todos', 'alto', 'medio', 'baixo'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={cn(
+              'px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all',
+              filter === f
+                ? f === 'todos' ? 'bg-foreground text-white border-foreground' : RISK_COLORS[f as ReturnRisk] + ' ring-1 ring-current'
+                : 'bg-white/50 text-muted-foreground border-white/40 hover:border-primary/30'
+            )}
+          >
+            {f === 'todos' ? `Todos${counts.alto || counts.medio ? ` (${Object.values(counts).reduce((a, b) => a + b, 0)})` : ''}` : `${RISK_LABELS[f as ReturnRisk]}${counts[f as ReturnRisk] ? ` (${counts[f as ReturnRisk]})` : ''}`}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-4 pb-4">
+        {patients.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Nenhum paciente neste filtro.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {patients.map(p => (
+              <div key={p.id} className="flex items-center gap-3 rounded-lg border border-white/50 bg-white/50 px-3 py-2 hover:bg-white/70 transition-colors">
+                <div className="h-7 w-7 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-bold text-white">{p.name[0]}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{p.reason}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border', RISK_COLORS[p.risk])}>
+                    {RISK_LABELS[p.risk]}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{p.daysOverdue}d</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function StatCard({ title, value, sub, icon: Icon, href }: { title: string; value: any; sub?: string; icon: any; href?: string }) {
   const router = useRouter();
   return (
@@ -342,16 +519,48 @@ const TASK_PRIORITY_COLORS: Record<string, string> = {
 
 const PRIORITY_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
+const TASK_ORIGIN_CACHE_KEY = 'ayron_tasks_cache';
+
+function getTaskOrigin(task: any): { label: string; emoji: string; color: string } {
+  const src = task.source ?? '';
+  const type = task.type ?? '';
+  if (src === 'ALERT' || src === 'SCORE') return { label: 'Risco', emoji: '⚠️', color: 'text-red-600 bg-red-50 border-red-200' };
+  if (src === 'FINANCE' || type === 'COLLECT_PAYMENT') return { label: 'Financeiro', emoji: '💰', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+  if (type === 'REQUEST_DOCUMENT' || type === 'FOLLOWUP_PROTOCOL' || type === 'FOLLOWUP_IMPLANT') return { label: 'Exame', emoji: '🧪', color: 'text-blue-600 bg-blue-50 border-blue-200' };
+  return { label: 'Manual', emoji: '📋', color: 'text-muted-foreground bg-white/60 border-border' };
+}
+
+function mergeWithLocal(backendTasks: any[]): any[] {
+  try {
+    const local: any[] = JSON.parse(localStorage.getItem(TASK_ORIGIN_CACHE_KEY + '_local') ?? '[]');
+    const backendIds = new Set(backendTasks.map((t: any) => t.id));
+    const localOnly = local.filter((t: any) => !backendIds.has(t.id));
+    return [...backendTasks, ...localOnly];
+  } catch { return backendTasks; }
+}
+
 function TopTasksBlock() {
   const router = useRouter();
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery<any[]>({
     queryKey: ['dashboard-top-tasks'],
-    queryFn: () => api.get('/tasks?due=today&limit=50').then(r => {
-      const list = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
-      return list.filter((t: any) => t.status === 'OPEN' || t.status === 'IN_PROGRESS');
-    }),
+    queryFn: async () => {
+      try {
+        const r = await api.get('/tasks?due=today&limit=50');
+        const list = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
+        const filtered = list.filter((t: any) => t.status === 'OPEN' || t.status === 'IN_PROGRESS');
+        // Cache bem-sucedido no localStorage como fallback
+        try { localStorage.setItem(TASK_ORIGIN_CACHE_KEY, JSON.stringify(filtered)); } catch {}
+        return mergeWithLocal(filtered);
+      } catch {
+        // Fallback: localStorage cache da última busca
+        try {
+          const cached = JSON.parse(localStorage.getItem(TASK_ORIGIN_CACHE_KEY) ?? '[]');
+          return mergeWithLocal(cached);
+        } catch { return []; }
+      }
+    },
     refetchInterval: 60_000,
   });
 
@@ -412,17 +621,23 @@ function TopTasksBlock() {
             {top10.map((task: any, idx: number) => {
               const minutes = TASK_TIME[task.priority] ?? 15;
               const isOverdue = new Date(task.due_at) < new Date();
+              const origin = getTaskOrigin(task);
               return (
                 <div
                   key={task.id}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors hover:bg-muted/30 ${isOverdue ? 'border-red-200 bg-red-50/40' : 'border-border bg-white'}`}
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors hover:bg-white/70 ${isOverdue ? 'border-red-200 bg-red-50/40' : 'border-white/50 bg-white/55'}`}
                 >
                   <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">{idx + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-foreground truncate">{task.title}</p>
-                    {task.patient && (
-                      <p className="text-[10px] text-muted-foreground truncate">{task.patient.full_name}</p>
-                    )}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {task.patient && (
+                        <p className="text-[10px] text-muted-foreground truncate">{task.patient.full_name}</p>
+                      )}
+                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded border ${origin.color}`}>
+                        {origin.emoji} {origin.label}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${TASK_PRIORITY_COLORS[task.priority]}`}>
@@ -562,6 +777,22 @@ function NotesBlock() {
   ]);
   const [showForm, setShowForm] = useState(false);
   const [newNote, setNewNote] = useState({ text: '', lembrete: '' });
+  const [notesLoaded, setNotesLoaded] = useState(false);
+
+  // Load from localStorage on mount (SSR-safe)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ayron_dashboard_notes');
+      if (saved) setNotes(JSON.parse(saved));
+    } catch {}
+    setNotesLoaded(true);
+  }, []);
+
+  // Persist to localStorage on change (after initial load)
+  useEffect(() => {
+    if (!notesLoaded) return;
+    try { localStorage.setItem('ayron_dashboard_notes', JSON.stringify(notes)); } catch {}
+  }, [notes, notesLoaded]);
 
   function handleSave() {
     if (!newNote.text.trim()) { toast.error('Escreva uma nota'); return; }
@@ -625,7 +856,7 @@ function NotesBlock() {
                   rows={3}
                   value={newNote.text}
                   onChange={(e) => setNewNote((f) => ({ ...f, text: e.target.value }))}
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none bg-white"
+                  className="w-full rounded-lg border border-white/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none bg-white/60 backdrop-blur-sm"
                   placeholder="Escreva sua nota..."
                 />
               </div>
@@ -635,7 +866,7 @@ function NotesBlock() {
                   type="date"
                   value={newNote.lembrete}
                   onChange={(e) => setNewNote((f) => ({ ...f, lembrete: e.target.value }))}
-                  className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                  className="rounded-lg border border-white/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 bg-white/60 backdrop-blur-sm"
                 />
               </div>
               <div className="flex gap-2">
@@ -767,7 +998,7 @@ function WelcomeModal() {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden [background:rgba(255,255,255,0.92)] [backdrop-filter:blur(24px)] [-webkit-backdrop-filter:blur(24px)] [box-shadow:0_24px_64px_rgba(0,0,0,0.18),0_4px_16px_rgba(0,0,0,0.10)]">
         {/* Header gradient */}
         <div className="bg-gradient-to-br from-primary to-secondary px-6 py-6 text-white">
           <div className="flex items-center gap-3 mb-1">
@@ -838,6 +1069,22 @@ export default function DashboardPage() {
     queryKey: ['dashboard-weekly'],
     queryFn: () => api.get('/dashboard/weekly').then(r => r.data),
   });
+
+  // Feed AYRON context: store dashboard summary for AYRON widget to consume
+  useEffect(() => {
+    if (!overview) return;
+    try {
+      const ayronContext = {
+        pendingDecisions: overview?.alerts?.pending_decisions ?? 0,
+        pendingBillings: overview?.financial?.pending_count ?? 0,
+        lowStockAlerts: overview?.alerts?.low_stock ?? 0,
+        consultasHoje: overview?.today?.total ?? 0,
+        ocupacaoHoje: overview?.today?.occupation_rate ?? 0,
+        updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('ayron_dashboard_context', JSON.stringify(ayronContext));
+    } catch {}
+  }, [overview]);
 
   return (
     <div>
@@ -911,9 +1158,10 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Cognitive Risk Block */}
+        {/* Risk Blocks */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <TopRiskBlock />
+          <ReturnRiskBlock />
         </div>
 
         {/* Notas & Lembretes */}

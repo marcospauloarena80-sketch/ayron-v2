@@ -140,7 +140,7 @@ const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const SHIFTS = [{ value: 'MANHA', label: 'Manhã' }, { value: 'TARDE', label: 'Tarde' }, { value: 'NOITE', label: 'Noite' }];
 const TIERS = ['BRONZE', 'SILVER', 'GOLD', 'VIP', 'PLATINA', 'DIAMANTE'];
 const TIPO_CONTATO_LIST = ['WHATSAPP', 'EMAIL', 'SMS', 'INSTAGRAM', 'INDICACAO', 'TELEFONE'];
-const DEFAULT_TAGS = ['GELADEIRA', 'FROZEN', 'DIAMANTE', 'APENAS_CONSULTA', 'VIP_PLUS', 'RISCO_EVASAO'];
+const DEFAULT_TAGS = ['EMBAIXADOR', 'GELADEIRA', 'FROZEN', 'DIAMANTE', 'APENAS_CONSULTA', 'VIP_PLUS', 'RISCO_EVASAO', 'RESTRICAO', 'PACIENTE_DIFICIL'];
 const MASTER_PASSWORD = 'MASTER@2024';
 
 interface Props {
@@ -551,9 +551,9 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Empresa" {...register('empresa')} />
                 <Input label="Referência" {...register('referencia')} />
-                <Select label="Conheceu por" {...register('conheceu_por')}>
+                <Select label="Origem do Paciente" {...register('conheceu_por')}>
                   <option value="">Selecione</option>
-                  {['Email','Facebook','Indicação','Internet','Instagram','Jornal/Revista','Outras redes sociais','Palestra','Propaganda'].map(t => <option key={t} value={t}>{t}</option>)}
+                  {['Instagram','WhatsApp','Indicação','Tráfego Pago','Presencial','Email','Facebook','Internet','Jornal/Revista','Palestra','Propaganda','Outros'].map(t => <option key={t} value={t}>{t}</option>)}
                 </Select>
                 <Input label="Indicado por" placeholder="Buscar contato..." {...register('indicado_por')} />
                 <Select label="Estado Civil" {...register('estado_civil')}>
@@ -645,6 +645,9 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
               <Input label="Especialidade / Médico de referência (complementar)"
                 placeholder="Ex.: Endocrinologia — Dr. Carlos, Dermatologia — Dra. Ana"
                 {...register('tier_especialidade')} />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Tier baseado em consumo prescrito: Bronze 0% · Prata 25% · Ouro 50% · VIP 75% · Diamante 100%
+              </p>
             </div>
 
             {/* Tipo de contato preferido */}

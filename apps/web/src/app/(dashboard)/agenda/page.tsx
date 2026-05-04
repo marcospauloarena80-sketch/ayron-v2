@@ -166,6 +166,13 @@ function ImprimirAgendaModal({ open, onClose }: { open: boolean; onClose: () => 
 
 function ConfirmacaoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tipo, setTipo] = useState<'oficial'|'nao-oficial'>('oficial');
+  const [escopo, setEscopo] = useState<'dia'|'semana'>('dia');
+  const [tipoAtend, setTipoAtend] = useState<'TODOS'|'CONSULTATION'|'RETURN'|'PROCEDURE'>('TODOS');
+
+  const TIPO_LABELS: Record<string, string> = {
+    TODOS: 'Todos', CONSULTATION: 'Consulta', RETURN: 'Retorno', PROCEDURE: 'Procedimento',
+  };
+
   return open ? (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl space-y-4">
@@ -173,14 +180,42 @@ function ConfirmacaoModal({ open, onClose }: { open: boolean; onClose: () => voi
           <h2 className="text-sm font-semibold">Confirmação de Consulta</h2>
           <button onClick={onClose}><X className="h-4 w-4" /></button>
         </div>
-        <p className="text-xs text-muted-foreground">Selecione o tipo de WhatsApp para envio das confirmações:</p>
-        <div className="flex gap-3">
-          {([['oficial','WhatsApp Oficial'],['nao-oficial','WhatsApp Não Oficial']] as const).map(([v,l])=>(
-            <button key={v} onClick={()=>setTipo(v)} className={`flex-1 py-2 rounded-lg border text-xs font-medium ${tipo===v?'bg-green-600 text-white border-green-600':'border-border text-muted-foreground'}`}>{l}</button>
-          ))}
+
+        <div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Escopo</p>
+          <div className="flex gap-2">
+            {(['dia','semana'] as const).map(v => (
+              <button key={v} onClick={() => setEscopo(v)}
+                className={`flex-1 py-1.5 rounded-lg border text-xs font-medium ${escopo===v ? 'bg-primary text-white border-primary' : 'border-border text-muted-foreground'}`}>
+                {v === 'dia' ? '📅 Hoje' : '📆 Esta semana'}
+              </button>
+            ))}
+          </div>
         </div>
+
+        <div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Tipo de Atendimento</p>
+          <div className="flex gap-1 flex-wrap">
+            {(['TODOS','CONSULTATION','RETURN','PROCEDURE'] as const).map(v => (
+              <button key={v} onClick={() => setTipoAtend(v)}
+                className={`px-2.5 py-1 rounded-full border text-[11px] font-medium ${tipoAtend===v ? 'bg-primary/10 text-primary border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                {TIPO_LABELS[v]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Canal de envio</p>
+          <div className="flex gap-3">
+            {([['oficial','WhatsApp Oficial'],['nao-oficial','WhatsApp Não Oficial']] as const).map(([v,l])=>(
+              <button key={v} onClick={()=>setTipo(v)} className={`flex-1 py-2 rounded-lg border text-xs font-medium ${tipo===v?'bg-green-600 text-white border-green-600':'border-border text-muted-foreground'}`}>{l}</button>
+            ))}
+          </div>
+        </div>
+
         <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
-          Até 300 envios de confirmações de consultas por SMS disponíveis no plano.
+          Até 300 envios de confirmações por SMS disponíveis no plano.
         </div>
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
@@ -533,6 +568,7 @@ export default function AgendaPage() {
   const [selectedProfessional, setSelectedProfessional] = useState('all');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [resumoAppt, setResumoAppt] = useState<any>(null);
+  const [legendCollapsed, setLegendCollapsed] = useState(true);
   const qc = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -671,13 +707,15 @@ export default function AgendaPage() {
         {/* Date Nav + Actions */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => setDate(d => subDays(d, 1))} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <button onClick={() => setDate(d => viewMode === 'semana_prof' ? subDays(d, 7) : subDays(d, 1))} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="text-sm font-semibold min-w-[200px] text-center capitalize">
-              {format(date, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+              {viewMode === 'semana_prof'
+                ? `${format(startOfWeek(date, { weekStartsOn: 1 }), "dd/MM")} – ${format(addDays(startOfWeek(date, { weekStartsOn: 1 }), 4), "dd/MM/yyyy")}`
+                : format(date, "EEEE, dd 'de' MMMM", { locale: ptBR })}
             </span>
-            <button onClick={() => setDate(d => addDays(d, 1))} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <button onClick={() => setDate(d => viewMode === 'semana_prof' ? addDays(d, 7) : addDays(d, 1))} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
               <ChevronRight className="h-4 w-4" />
             </button>
             <button onClick={() => setDate(new Date())} className="text-xs text-primary hover:underline ml-2">Hoje</button>
@@ -810,31 +848,49 @@ export default function AgendaPage() {
           ))}
         </div>
 
-        {/* Status legend — 13 MedX statuses */}
-        <div className="rounded-xl border border-border bg-white p-3">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Legenda de Status</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            {[
-              { color: 'bg-indigo-400', label: 'Agendado' },
-              { color: 'bg-emerald-400', label: 'Confirmado' },
-              { color: 'bg-amber-500 animate-pulse', label: 'Na Espera' },
-              { color: 'bg-blue-500 animate-pulse', label: 'Em Consulta' },
-              { color: 'bg-purple-500 animate-pulse', label: 'Em Procedimento' },
-              { color: 'bg-green-600', label: 'Concluído' },
-              { color: 'bg-red-400', label: 'Cancelado' },
-              { color: 'bg-red-600', label: 'Faltou / No-Show' },
-              { color: 'bg-orange-400', label: 'Desmarcado' },
-              { color: 'bg-amber-400', label: 'Reagendado' },
-              { color: 'bg-yellow-400', label: 'Lista de Espera' },
-              { color: 'bg-gray-400', label: 'Bloqueado' },
-              { color: 'bg-slate-400', label: 'Pré-Agendado' },
-            ].map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <span className={cn('h-2 w-2 rounded-full flex-shrink-0', color)} />
-                <span className="text-[10px] text-muted-foreground">{label}</span>
-              </div>
-            ))}
-          </div>
+        {/* Status legend — collapsible */}
+        <div className="rounded-xl border border-border bg-white">
+          <button
+            type="button"
+            onClick={() => setLegendCollapsed(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+          >
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Legenda de Status</p>
+            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${legendCollapsed ? '' : 'rotate-180'}`} />
+          </button>
+          <AnimatePresence initial={false}>
+            {!legendCollapsed && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="px-3 pb-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {[
+                    { color: 'bg-indigo-400', label: 'Agendado' },
+                    { color: 'bg-emerald-400', label: 'Confirmado' },
+                    { color: 'bg-amber-500 animate-pulse', label: 'Na Espera' },
+                    { color: 'bg-blue-500 animate-pulse', label: 'Em Consulta' },
+                    { color: 'bg-purple-500 animate-pulse', label: 'Em Procedimento' },
+                    { color: 'bg-green-600', label: 'Concluído' },
+                    { color: 'bg-red-400', label: 'Cancelado' },
+                    { color: 'bg-red-600', label: 'Faltou / No-Show' },
+                    { color: 'bg-orange-400', label: 'Desmarcado' },
+                    { color: 'bg-amber-400', label: 'Reagendado' },
+                    { color: 'bg-yellow-400', label: 'Lista de Espera' },
+                    { color: 'bg-gray-400', label: 'Bloqueado' },
+                    { color: 'bg-slate-400', label: 'Pré-Agendado' },
+                  ].map(({ color, label }) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full flex-shrink-0', color)} />
+                      <span className="text-[10px] text-muted-foreground">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Doctor timer for in-progress appointments */}
@@ -925,12 +981,24 @@ export default function AgendaPage() {
                     <p className="text-xs text-muted-foreground tabular-nums">{format(new Date(a.end_time), 'HH:mm')}</p>
                   </div>
                   <div>
-                    <button
-                      className="text-sm font-semibold text-left hover:text-primary transition-colors"
-                      onClick={() => router.push(`/patients/${a.patient_id}`)}
-                    >
-                      {a.patient?.full_name}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="text-sm font-semibold text-left hover:text-primary transition-colors"
+                        onClick={() => router.push(`/patients/${a.patient_id}`)}
+                      >
+                        {a.patient?.full_name}
+                      </button>
+                      {a.patient?.tier && a.patient.tier !== 'BRONZE' && (
+                        <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-full border', {
+                          'bg-amber-50 text-amber-700 border-amber-200': a.patient.tier === 'SILVER',
+                          'bg-yellow-50 text-yellow-700 border-yellow-200': a.patient.tier === 'GOLD',
+                          'bg-purple-50 text-purple-700 border-purple-200': a.patient.tier === 'VIP',
+                          'bg-blue-50 text-blue-700 border-blue-200': a.patient.tier === 'DIAMOND',
+                        })}>
+                          {a.patient.tier === 'SILVER' ? '🥈 Prata' : a.patient.tier === 'GOLD' ? '🥇 Ouro' : a.patient.tier === 'VIP' ? '💎 VIP' : a.patient.tier === 'DIAMOND' ? '💠 Diamante' : a.patient.tier}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <p className="text-xs text-muted-foreground">
                         {a.service?.name ?? TYPE_LABELS[a.type] ?? a.type}
@@ -982,6 +1050,16 @@ export default function AgendaPage() {
                           onClick={() => { setResumoAppt(a); setOpenMenuId(null); }}>
                           <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Resumo
                         </button>
+                        {['CHECKED_IN', 'SCHEDULED', 'CONFIRMED'].includes(a.status) && (
+                          <button className="flex w-full items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-primary/5 transition-colors font-medium"
+                            onClick={() => {
+                              statusMutation.mutate({ id: a.id, status: 'IN_PROGRESS' });
+                              router.push(`/clinical?patientId=${a.patient_id}&patientName=${encodeURIComponent(a.patient?.full_name ?? '')}`);
+                              setOpenMenuId(null);
+                            }}>
+                            <UserCheck className="h-3.5 w-3.5" /> Iniciar atendimento
+                          </button>
+                        )}
                         <button className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors"
                           onClick={() => { router.push(`/clinical?patientId=${a.patient_id}&patientName=${encodeURIComponent(a.patient?.full_name ?? '')}`); setOpenMenuId(null); }}>
                           <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Prontuário
