@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { EventsService } from '../events/events.service';
@@ -6,6 +6,8 @@ import { CreateClinicalRecordDto } from './dto/create-clinical-record.dto';
 import { CreatePatientMetricsDto } from './dto/create-patient-metrics.dto';
 import { CreateProtocolDto, UpdateProtocolDto } from './dto/create-protocol.dto';
 import { CreateImplantDto } from './dto/create-implant.dto';
+import { StorageService } from '../common/storage/storage.service';
+import { AiTranscriptionService } from './ai-transcription.service';
 
 @Injectable()
 export class ClinicalService {
@@ -13,6 +15,8 @@ export class ClinicalService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly events: EventsService,
+    private readonly storage: StorageService,
+    private readonly aiTranscription: AiTranscriptionService,
   ) {}
 
   // ─── Clinical Records ────────────────────────────────────────────────
@@ -298,5 +302,106 @@ export class ClinicalService {
       where: { clinic_id: clinicId, patient_id: patientId, deleted_at: null },
       orderBy: { application_date: 'desc' },
     });
+  }
+
+  // ─── Consultation Sessions (Consulta IA) ────────────────────────────────────
+
+  async uploadConsultationSession(
+    clinicId: string,
+    patientId: string,
+    file: Express.Multer.File,
+    actorId: string,
+  ) {
+    const key = `clinical/${clinicId}/${patientId}/sessions/${Date.now()}-${file.originalname}`;
+    await this.storage.uploadBuffer(key, file.buffer, file.mimetype);
+
+    const endpoint = process.env.MINIO_ENDPOINT ?? 'http://localhost:9000';
+    const bucket = process.env.MINIO_BUCKET ?? 'ayron-docs';
+    const audioUrl = `${endpoint}/${bucket}/${key}`;
+
+    const record = await this.prisma.clinicalRecord.create({
+      data: {
+        clinic_id: clinicId,
+        patient_id: patientId,
+        professional_id: actorId,
+        voice_file_url: audioUrl,
+        transcription: null,
+        structured_data: {},
+        summary_ai: null,
+      },
+    });
+
+    await this.audit.log({
+      clinic_id: clinicId,
+      actor_id: actorId,
+      action: 'CREATE',
+      entity_type: 'ClinicalRecord',
+      entity_id: record.id,
+    });
+
+    return { id: record.id, voice_file_url: audioUrl };
+  }
+
+  async transcribeConsultationSession(clinicId: string, id: string, actorId: string) {
+    const record = await this.prisma.clinicalRecord.findFirst({
+      where: { id, clinic_id: clinicId, deleted_at: null },
+    });
+    if (!record) throw new NotFoundException('Session not found');
+    if (!record.voice_file_url) throw new BadRequestException('No audio file associated with this session');
+
+    const audioBuffer = await this.storage.download(record.voice_file_url);
+    const rawText = await this.aiTranscription.transcribeAudio(audioBuffer, 'consulta.webm');
+    const { segments } = await this.aiTranscription.diarizeAndClassify(rawText);
+    const extraction = await this.aiTranscription.extractClinicalData(segments);
+
+    await this.prisma.clinicalRecord.update({
+      where: { id },
+      data: {
+        transcription: rawText,
+        structured_data: { segments, ...extraction } as object,
+        summary_ai: extraction.queixa_principal,
+      },
+    });
+
+    await this.audit.log({
+      clinic_id: clinicId,
+      actor_id: actorId,
+      action: 'UPDATE',
+      entity_type: 'ClinicalRecord',
+      entity_id: id,
+    });
+
+    return { id, transcription: rawText, segments, extraction };
+  }
+
+  async getLatestConsultationSession(clinicId: string, patientId: string) {
+    const record = await this.prisma.clinicalRecord.findFirst({
+      where: { clinic_id: clinicId, patient_id: patientId, deleted_at: null },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!record) return null;
+    const data = record.structured_data as Record<string, unknown> | null;
+    return {
+      id: record.id,
+      voice_file_url: record.voice_file_url,
+      transcript: data?.segments ? { segments: data.segments } : null,
+      structured_data: data?.queixa_principal ? data : null,
+      summary_ai: record.summary_ai,
+    };
+  }
+
+  async getRecordById(clinicId: string, id: string) {
+    const record = await this.prisma.clinicalRecord.findFirst({
+      where: { id, clinic_id: clinicId, deleted_at: null },
+    });
+    if (!record) throw new NotFoundException('Record not found');
+    const data = record.structured_data as Record<string, unknown> | null;
+    return {
+      id: record.id,
+      voice_file_url: record.voice_file_url,
+      transcript: data?.segments ? { segments: data.segments } : null,
+      structured_data: data?.queixa_principal ? data : null,
+      summary_ai: record.summary_ai,
+    };
   }
 }

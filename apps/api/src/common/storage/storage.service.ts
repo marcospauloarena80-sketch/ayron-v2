@@ -70,6 +70,21 @@ export class StorageService implements OnModuleInit {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 
+  async download(urlOrKey: string): Promise<Buffer> {
+    // Extract key from full URL or use as-is
+    const key =
+      urlOrKey.startsWith('http') ? new URL(urlOrKey).pathname.slice(1) : urlOrKey;
+    const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+    const res = await this.client.send(cmd);
+    const stream = res.Body as NodeJS.ReadableStream;
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as any));
+    }
+    return Buffer.concat(chunks);
+  }
+
   async healthCheck(): Promise<boolean> {
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));

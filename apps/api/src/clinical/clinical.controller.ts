@@ -131,4 +131,40 @@ export class ClinicalController {
   ) {
     return this.bioimpSvc.confirmBioimpedance(u.clinic_id, patientId, dto.appointment_id, dto, u.sub);
   }
+
+  // ─── Consultation Sessions (Consulta IA) ──────────────────────────────────
+
+  @Post('records/upload-session')
+  @UseInterceptors(FileInterceptor('audio'))
+  uploadConsultationAudio(
+    @CurrentUser() u: RequestUser,
+    @Body('patient_id') patientId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.uploadConsultationSession(u.clinic_id, patientId, file, u.sub);
+  }
+
+  @Post('records/:id/transcribe')
+  transcribeSession(
+    @CurrentUser() u: RequestUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.transcribeConsultationSession(u.clinic_id, id, u.sub);
+  }
+
+  @Get('records/patient/:patientId/latest-session')
+  getLatestSession(
+    @CurrentUser() u: RequestUser,
+    @Param('patientId') patientId: string,
+  ) {
+    return this.service.getLatestConsultationSession(u.clinic_id, patientId);
+  }
+
+  @Get('records/:id')
+  getRecord(
+    @CurrentUser() u: RequestUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.getRecordById(u.clinic_id, id);
+  }
 }
