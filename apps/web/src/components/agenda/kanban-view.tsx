@@ -29,6 +29,7 @@ export function KanbanView({ appointments, date, onFinalizeRequest }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [skipReason, setSkipReason] = useState('');
   const [pendingMove, setPendingMove] = useState<{ id: string; fromStage: string; toStage: string } | null>(null);
+  const [finalizeTarget, setFinalizeTarget] = useState<any | null>(null);
 
   const stageMutation = useMutation({
     mutationFn: ({ id, stage, skipped_reason }: { id: string; stage: string; skipped_reason?: string }) =>
@@ -54,7 +55,7 @@ export function KanbanView({ appointments, date, onFinalizeRequest }: Props) {
     if (from === targetStage) { setDragId(null); return; }
 
     if (targetStage === 'FINALIZADO') {
-      onFinalizeRequest?.(appt);
+      setFinalizeTarget(appt);
       setDragId(null);
       return;
     }
@@ -105,6 +106,55 @@ export function KanbanView({ appointments, date, onFinalizeRequest }: Props) {
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" size="sm" onClick={() => { setPendingMove(null); setSkipReason(''); }}>Cancelar</Button>
               <Button size="sm" onClick={confirmSkip} loading={stageMutation.isPending}>Confirmar</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {finalizeTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-base font-bold mb-1">Finalizar atendimento</h3>
+            <p className="text-sm text-muted-foreground mb-4">{finalizeTarget.patient?.full_name ?? finalizeTarget.patient_name}</p>
+
+            {finalizeTarget.next_appointment_date ? (
+              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4">
+                <span>✅</span>
+                <span>Próximo retorno agendado — {new Date(finalizeTarget.next_appointment_date).toLocaleDateString('pt-BR')}</span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                <span className="mt-0.5">⚠️</span>
+                <span>Paciente sem próximo agendamento. Recomendado agendar retorno antes de finalizar.</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              {!finalizeTarget.next_appointment_date && (
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    onFinalizeRequest?.(finalizeTarget);
+                    stageMutation.mutate({ id: finalizeTarget.id, stage: 'FINALIZADO' });
+                    setFinalizeTarget(null);
+                  }}
+                >
+                  📅 Agendar Retorno e Finalizar
+                </Button>
+              )}
+              <Button
+                variant={finalizeTarget.next_appointment_date ? 'primary' : 'secondary'}
+                className="w-full"
+                onClick={() => {
+                  stageMutation.mutate({ id: finalizeTarget.id, stage: 'FINALIZADO' });
+                  setFinalizeTarget(null);
+                }}
+              >
+                {finalizeTarget.next_appointment_date ? 'Finalizar' : 'Finalizar mesmo assim'}
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => setFinalizeTarget(null)}>
+                Cancelar
+              </Button>
             </div>
           </div>
         </div>
