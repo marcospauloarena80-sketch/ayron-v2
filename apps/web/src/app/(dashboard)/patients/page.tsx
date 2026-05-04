@@ -72,9 +72,12 @@ const STATUS_LABELS: Record<string, string> = {
   LISTA_ESPERA: 'Lista Espera', REAGENDADO: 'Reagendado', AGUARDANDO_ATENDIMENTO: 'Em Espera',
 };
 const TAG_LABELS: Record<string, string> = {
-  GELADEIRA: 'Geladeira', FROZEN: 'Frozen', DIAMANTE: 'Diamante', APENAS_CONSULTA: 'Só Consulta',
+  GELADEIRA: '🧊 Geladeira', FROZEN: '❄️ Frozen', DIAMANTE: '💎 Diamante', APENAS_CONSULTA: '🩺 Só Consulta',
   EMBAIXADOR: '⭐ Embaixador', RESTRICAO: '🚫 Restrição', PACIENTE_DIFICIL: '⚠️ P. Difícil',
-  VIP_PLUS: 'VIP+', RISCO_EVASAO: 'Risco Evasão',
+  VIP_PLUS: '👑 VIP+', RISCO_EVASAO: '📉 Risco Evasão',
+  // Tags originadas de mensagens (Messages sidebar)
+  RESPONDEU: '✅ Respondeu', NAO_RESPONDEU: '📵 Não Respondeu', AGUARDANDO_RETORNO: '⏳ Aguardando',
+  INTERESSADO: '💡 Interessado', EM_NEGOCIACAO: '🤝 Em Negociação', LEAD_FRIO: '🧊 Lead Frio',
 };
 
 const ORIGEM_LABELS: Record<string, string> = {
@@ -942,7 +945,8 @@ export default function PatientsPage() {
     if (s && !p.full_name?.toLowerCase().includes(s) && !p.phone?.includes(s) && !p.cpf?.replace(/\D/g,'').includes(s.replace(/\D/g,'')) && !p.email?.toLowerCase().includes(s)) return false;
     if (filters.sexo && p.sex !== filters.sexo) return false;
     if (filters.tier && p.tier !== filters.tier) return false;
-    if (filters.tag && !p.tags?.includes(filters.tag)) return false;
+    if (filters.tag && filters.tag !== 'INATIVO_5ANOS' && !p.tags?.includes(filters.tag)) return false;
+    if (filters.tag === 'INATIVO_5ANOS' && (p.days_absent ?? 0) < 1825) return false;
     if (filters.tipo_contato && p.tipo_contato !== filters.tipo_contato) return false;
     if (filters.mala_direta === 'SIM' && !p.mala_direta) return false;
     if (filters.mala_direta === 'NAO' && p.mala_direta) return false;
@@ -953,6 +957,7 @@ export default function PatientsPage() {
     if (filters.status && p.current_status !== filters.status) return false;
     if (filters.origem && p.conheceu_por !== filters.origem) return false;
     if (filters.indicado_por && !p.indicado_por?.toLowerCase().includes(filters.indicado_por.toLowerCase())) return false;
+    if (quickFilter === 'ATIVO' && p.current_status === 'INATIVO') return false;
     if (quickFilter === 'VIP' && !['DIAMANTE','PLATINA','VIP'].includes(p.tier)) return false;
     if (quickFilter === 'EM_RISCO' && p.days_absent < 60) return false;
     if (quickFilter === 'INATIVO' && p.current_status !== 'INATIVO') return false;
@@ -1004,6 +1009,7 @@ export default function PatientsPage() {
         <div className="flex gap-2 flex-wrap">
           {[
             { key: '', label: 'Todos', count: total },
+            { key: 'ATIVO', label: '✅ Ativos', count: allPatients.filter(p => p.current_status !== 'INATIVO').length },
             { key: 'VIP', label: '💎 VIP+', count: allPatients.filter(p => ['DIAMANTE','PLATINA','VIP'].includes(p.tier)).length },
             { key: 'EM_RISCO', label: '⚠️ Em Risco', count: allPatients.filter(p => (p.days_absent ?? 0) >= 60 && p.current_status !== 'INATIVO').length },
             { key: 'INATIVO', label: '🔴 Inativos', count: inativoCount },
@@ -1099,6 +1105,9 @@ export default function PatientsPage() {
                     <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
                   ))}
                 </select>
+                <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                  Pacientes inativos há mais de 5 anos são candidatos a arquivamento.
+                </p>
               </div>
 
               {/* Tag */}
@@ -1107,6 +1116,7 @@ export default function PatientsPage() {
                 <select value={filters.tag} onChange={e => setFilter('tag', e.target.value)}
                   className="w-full px-2 py-1.5 rounded-lg border border-border text-xs bg-white outline-none focus:border-primary">
                   <option value="">Todas</option>
+                  <option value="INATIVO_5ANOS">⚠️ Inativo há +5 anos</option>
                   {Object.entries(TAG_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
                   ))}
