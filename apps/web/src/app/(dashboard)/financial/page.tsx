@@ -23,7 +23,7 @@ import {
   FileText, Receipt, Package, Activity, Cpu, Shield, Brain,
   ArrowLeftRight, Upload, Printer, Send, Search, Filter,
   Edit2, ChevronLeft, Bot, Sparkles, Building2, FilePlus,
-  ClipboardList, TrendingDown, Wallet, PieChart, X, Check,
+  ClipboardList, TrendingDown, Wallet, PieChart, X, Check, Video,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -428,7 +428,8 @@ const STATUS_LABELS: Record<string, string> = {
 type ModuleKey =
   | 'hub' | 'vendas' | 'lancamentos' | 'dashboard'
   | 'relatorios' | 'sessoes' | 'stone' | 'tiss'
-  | 'ia' | 'nfe' | 'fechamento' | 'auditoria';
+  | 'ia' | 'nfe' | 'fechamento' | 'auditoria'
+  | 'estoque' | 'teleconsulta';
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
 
@@ -444,6 +445,8 @@ const MODULES: { key: ModuleKey; label: string; icon: any; desc: string; color: 
   { key: 'nfe', label: 'Emissão de Nota Fiscal', icon: FileText, desc: 'NFS-e e configurações fiscais', color: 'bg-rose-50 text-rose-700 border-rose-200' },
   { key: 'fechamento', label: 'Fechamento de Caixa', icon: Wallet, desc: 'Fechamento diário e reconciliação', color: 'bg-slate-50 text-slate-700 border-slate-200' },
   { key: 'auditoria', label: 'Auditoria', icon: ClipboardList, desc: 'Log de operações financeiras', color: 'bg-gray-50 text-gray-700 border-gray-200' },
+  { key: 'estoque', label: 'Controle de Estoque', icon: Package, desc: 'Insumos, injetáveis e inventário', color: 'bg-lime-50 text-lime-700 border-lime-200' },
+  { key: 'teleconsulta', label: 'Teleconsulta', desc: 'Consultas online e links de pagamento', icon: Video, color: 'bg-sky-50 text-sky-700 border-sky-200' },
 ];
 
 function FinancialHub({ onSelect }: { onSelect: (k: ModuleKey) => void }) {
@@ -2652,6 +2655,57 @@ export default function FinancialPage() {
         {module === 'nfe' && <NotaFiscalTab />}
         {module === 'fechamento' && <FechamentoTab />}
         {module === 'auditoria' && <AuditoriaTab />}
+        {module === 'estoque' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Controle de Estoque</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Insumos e injetáveis da clínica</p>
+              </div>
+              <Button variant="ghost" onClick={() => setModule('hub')}>← Voltar ao Hub</Button>
+            </div>
+            <div className="rounded-xl border border-border bg-white p-8 text-center">
+              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p className="text-sm text-muted-foreground">Acesse o módulo completo de estoque</p>
+              <Button className="mt-4" onClick={() => window.location.href = '/inventory/items'}>
+                Ir para Controle de Estoque
+              </Button>
+            </div>
+          </div>
+        )}
+        {module === 'teleconsulta' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Teleconsulta</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Consultas online e cobranças remotas</p>
+              </div>
+              <Button variant="ghost" onClick={() => setModule('hub')}>← Voltar ao Hub</Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Links ativos', value: '3', icon: Video, color: 'text-sky-600' },
+                { label: 'Consultas este mês', value: '12', icon: Video, color: 'text-green-600' },
+                { label: 'Receita telecons.', value: 'R$ 4.200', icon: Video, color: 'text-purple-600' },
+              ].map(item => (
+                <div key={item.label} className="rounded-xl border border-border bg-white p-5">
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
+                  <p className="text-2xl font-bold mt-1">{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-xl border border-border bg-white p-6">
+              <h3 className="font-semibold mb-3">Gerar link de pagamento + consulta</h3>
+              <div className="flex gap-3">
+                <input placeholder="Nome do paciente" className="flex-1 rounded-lg border border-border px-3 py-2 text-sm" readOnly />
+                <input placeholder="Valor (R$)" className="w-32 rounded-lg border border-border px-3 py-2 text-sm" readOnly />
+                <Button onClick={() => toast.success('Link gerado e enviado via WhatsApp')}>
+                  Gerar Link
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
