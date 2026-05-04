@@ -759,6 +759,154 @@ function DeleteModal({ item, onClose, onConfirm }: {
   );
 }
 
+// ── ReconcileModal ────────────────────────────────────────────────────────────
+
+function ReconcileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [step, setStep] = useState<'input' | 'review' | 'done'>('input');
+  const [items, setItems] = useState([
+    { id: '1', name: 'Ozempic 0,5mg/dose', systemQty: 12, physicalQty: '', status: '' as '' | 'OK' | 'DIVERGENTE' },
+    { id: '2', name: 'Mounjaro 2,5mg', systemQty: 8, physicalQty: '', status: '' as '' | 'OK' | 'DIVERGENTE' },
+    { id: '3', name: 'Testosterona gel 50mg', systemQty: 24, physicalQty: '', status: '' as '' | 'OK' | 'DIVERGENTE' },
+    { id: '4', name: 'Vitamina D 50.000UI', systemQty: 30, physicalQty: '', status: '' as '' | 'OK' | 'DIVERGENTE' },
+    { id: '5', name: 'Metformina 850mg', systemQty: 45, physicalQty: '', status: '' as '' | 'OK' | 'DIVERGENTE' },
+  ]);
+
+  if (!open) return null;
+
+  const updatePhysical = (id: string, val: string) => {
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const phys = parseInt(val, 10);
+      const status = isNaN(phys) ? '' : phys === item.systemQty ? 'OK' : 'DIVERGENTE';
+      return { ...item, physicalQty: val, status };
+    }));
+  };
+
+  const divergentes = items.filter(i => i.status === 'DIVERGENTE');
+  const ok = items.filter(i => i.status === 'OK');
+  const pending = items.filter(i => i.status === '');
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div>
+            <h2 className="text-lg font-bold">Conciliar Estoque</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Compare o estoque físico com o sistema</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
+        </div>
+
+        {step === 'input' && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-3">
+            <p className="text-sm text-muted-foreground mb-4">Informe a quantidade física de cada item:</p>
+            {items.map(item => (
+              <div key={item.id} className="flex items-center gap-4 rounded-lg border border-border p-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">Sistema: {item.systemQty} unidades</p>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Qtd física"
+                  value={item.physicalQty}
+                  onChange={e => updatePhysical(item.id, e.target.value)}
+                  className="w-24 rounded-lg border border-border px-3 py-2 text-sm text-center focus:ring-2 focus:ring-primary/30 outline-none"
+                />
+                {item.status === 'OK' && <span className="text-green-600 text-sm font-bold w-8">✅</span>}
+                {item.status === 'DIVERGENTE' && <span className="text-red-600 text-sm font-bold w-8">⚠️</span>}
+                {item.status === '' && <span className="w-8" />}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {step === 'review' && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {divergentes.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-red-700 mb-2">⚠️ Divergências ({divergentes.length})</h3>
+                {divergentes.map(item => (
+                  <div key={item.id} className="flex items-center justify-between rounded-lg bg-red-50 border border-red-200 px-4 py-3 mb-2">
+                    <span className="text-sm font-medium">{item.name}</span>
+                    <div className="text-right">
+                      <span className="text-xs text-muted-foreground">Sistema: {item.systemQty} → Físico: </span>
+                      <span className={`text-sm font-bold ${parseInt(item.physicalQty) < item.systemQty ? 'text-red-700' : 'text-amber-700'}`}>
+                        {item.physicalQty}
+                      </span>
+                      <span className="text-xs text-red-600 ml-1">
+                        ({parseInt(item.physicalQty) - item.systemQty > 0 ? '+' : ''}{parseInt(item.physicalQty) - item.systemQty})
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {ok.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-green-700 mb-2">✅ OK ({ok.length})</h3>
+                {ok.map(item => (
+                  <div key={item.id} className="flex items-center justify-between rounded-lg bg-green-50 border border-green-200 px-4 py-3 mb-2">
+                    <span className="text-sm font-medium">{item.name}</span>
+                    <span className="text-sm font-bold text-green-700">{item.systemQty} unidades</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {pending.length > 0 && (
+              <p className="text-xs text-amber-600">⚠️ {pending.length} item(s) sem quantidade informada serão ignorados.</p>
+            )}
+          </div>
+        )}
+
+        {step === 'done' && (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <span className="text-3xl">✅</span>
+            </div>
+            <h3 className="text-lg font-bold">Conciliação concluída</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              {divergentes.length} divergência(s) registrada(s). Ajustes aplicados ao estoque.
+            </p>
+          </div>
+        )}
+
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+          {step === 'input' && (
+            <>
+              <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted">Cancelar</button>
+              <button
+                onClick={() => setStep('review')}
+                disabled={items.every(i => i.physicalQty === '')}
+                className="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+              >
+                Revisar →
+              </button>
+            </>
+          )}
+          {step === 'review' && (
+            <>
+              <button onClick={() => setStep('input')} className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted">← Voltar</button>
+              <button
+                onClick={() => setStep('done')}
+                className="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-primary/90"
+              >
+                Aplicar ajustes
+              </button>
+            </>
+          )}
+          {step === 'done' && (
+            <button onClick={() => { setStep('input'); onClose(); }} className="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-primary/90">
+              Fechar
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function InventoryItemsPage() {
@@ -779,6 +927,7 @@ export default function InventoryItemsPage() {
   const [historyItem, setHistoryItem] = useState<StockItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<StockItem | null>(null);
   const [showConsolidate, setShowConsolidate] = useState(false);
+  const [showReconcile, setShowReconcile] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   const filtered = items.filter(item => {
@@ -932,8 +1081,11 @@ export default function InventoryItemsPage() {
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowConsolidate(true)}>
             <Layers className="h-3.5 w-3.5 text-blue-600" />Consolidar
           </Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowReconcile(true)}>
+            ⚖️ Conciliar Estoque
+          </Button>
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => importRef.current?.click()}>
-            <Upload className="h-3.5 w-3.5 text-purple-600" />Importar CSV
+            <Upload className="h-3.5 w-3.5 text-purple-600" />Importar Injetáveis
           </Button>
           <Link href="/inventory/reports">
             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
@@ -1027,6 +1179,7 @@ export default function InventoryItemsPage() {
       {detailItem && <ItemDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
       {historyItem && <ItemHistoryModal item={historyItem} onClose={() => setHistoryItem(null)} />}
       {deleteItem && <DeleteModal item={deleteItem} onClose={() => setDeleteItem(null)} onConfirm={deact => handleDelete(deleteItem, deact)} />}
+      <ReconcileModal open={showReconcile} onClose={() => setShowReconcile(false)} />
     </div>
   );
 }
