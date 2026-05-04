@@ -570,6 +570,28 @@ function ImportExameModal({ open, onClose, onSave }: { open: boolean; onClose: (
   );
 }
 
+// ── ExamStatusBadge ──────────────────────────────────────────────────────────
+
+function ExamStatusBadge({ status, trend }: { status?: string; trend?: string }) {
+  const config = ({
+    NORMAL: { label: '✅ Normal', cls: 'bg-green-100 text-green-700 border-green-200' },
+    ALTERADO: { label: '⚠️ Alterado', cls: 'bg-red-100 text-red-700 border-red-200' },
+    ATENCAO: { label: '📈 Atenção', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    ABOVE_IDEAL: { label: '↑ Acima', cls: 'bg-red-100 text-red-700 border-red-200' },
+    BELOW_IDEAL: { label: '↓ Abaixo', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    IDEAL: { label: '✅ Ideal', cls: 'bg-green-100 text-green-700 border-green-200' },
+    CRITICO: { label: '🚨 Crítico', cls: 'bg-red-100 text-red-700 border-red-200' },
+  } as Record<string, { label: string; cls: string }>)[status ?? ''] ?? { label: status ?? '—', cls: 'bg-muted text-muted-foreground border-border' };
+
+  const trendIcon = trend === 'IMPROVING' ? ' 📈' : trend === 'WORSENING' ? ' 📉' : '';
+
+  return (
+    <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border', config.cls)}>
+      {config.label}{trendIcon}
+    </span>
+  );
+}
+
 // ── Prontuário detail ──────────────────────────────────────────────────────────
 
 function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => void }) {
@@ -809,6 +831,29 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                     <label className="text-xs font-bold text-muted-foreground">CID</label>
                     <input value={newEvolucao.cid} onChange={e => setNewEvolucao(v => ({ ...v, cid: e.target.value }))}
                       placeholder="Ex.: E66.0" className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-primary/30" />
+                    {newEvolucao.cid === '' && (
+                      <div className="mt-1.5">
+                        <p className="text-[10px] text-muted-foreground mb-1">Sugestões (baseado em histórico):</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {[
+                            { code: 'E66.0', label: 'Obesidade grau II' },
+                            { code: 'E11.9', label: 'DM tipo 2' },
+                            { code: 'I10', label: 'Hipertensão arterial' },
+                            { code: 'E29.1', label: 'Hipofunção testicular' },
+                            { code: 'E28.2', label: 'Síndrome dos ovários policísticos' },
+                          ].map(({ code, label }) => (
+                            <button
+                              key={code}
+                              type="button"
+                              onClick={() => setNewEvolucao(v => ({ ...v, cid: `${code} — ${label}` }))}
+                              className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-muted hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                            >
+                              {code} {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {[
@@ -994,7 +1039,7 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="text-sm font-semibold">{ex.name}</p>
-                        <Badge variant={ex.status === 'NORMAL' ? 'success' : 'warning'} className="text-[10px]">{ex.status}</Badge>
+                        <ExamStatusBadge status={ex.status} />
                         {ex.ai_data && (
                           <span className="flex items-center gap-0.5 text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
                             <Brain className="h-2.5 w-2.5" />AYRON
