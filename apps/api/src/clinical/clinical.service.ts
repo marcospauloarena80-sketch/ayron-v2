@@ -8,6 +8,7 @@ import { CreateProtocolDto, UpdateProtocolDto } from './dto/create-protocol.dto'
 import { CreateImplantDto } from './dto/create-implant.dto';
 import { StorageService } from '../common/storage/storage.service';
 import { AiTranscriptionService } from './ai-transcription.service';
+import { AuditAction } from '@prisma/client';
 
 @Injectable()
 export class ClinicalService {
@@ -403,5 +404,70 @@ export class ClinicalService {
       structured_data: data?.queixa_principal ? data : null,
       summary_ai: record.summary_ai,
     };
+  }
+
+  // ─── Clinical Audit Log ──────────────────────────────────────────────────────
+
+  async logClinicalAction(
+    clinicId: string,
+    patientId: string,
+    actorId: string,
+    dto: { action: string; detail: string; data_before?: Record<string, unknown>; data_after?: Record<string, unknown> },
+  ) {
+    // Map frontend action strings to AuditAction enum values
+    const ACTION_MAP: Record<string, AuditAction> = {
+      EVOLUÇÃO_REGISTRADA: 'CREATE' as AuditAction,
+      CID_ALTERADO: 'UPDATE' as AuditAction,
+      EVOLUÇÃO_PRÉ_PREENCHIDA: 'AI_GENERATE' as AuditAction,
+      ANAMNESE_PRÉ_PREENCHIDA: 'AI_GENERATE' as AuditAction,
+      RECEITA_PRÉ_PREENCHIDA: 'AI_GENERATE' as AuditAction,
+      EXAME_PRÉ_PREENCHIDO: 'AI_GENERATE' as AuditAction,
+      KANBAN_OVERRIDE: 'STAGE_CHANGE' as AuditAction,
+    };
+    const auditAction: AuditAction = ACTION_MAP[dto.action] ?? ('UPDATE' as AuditAction);
+
+    await this.audit.log({
+      clinic_id: clinicId,
+      actor_id: actorId,
+      action: auditAction,
+      entity_type: 'Patient',
+      entity_id: patientId,
+      metadata: { action_label: dto.action, detail: dto.detail },
+      data_before: dto.data_before,
+      data_after: dto.data_after,
+    });
+
+    return { ok: true };
+  }
+
+  async getClinicalAuditLogs(clinicId: string, patientId: string, limit = 30) {
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        clinic_id: clinicId,
+        entity_type: 'Patient',
+        entity_id: patientId,
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        action: true,
+        metadata: true,
+        data_before: true,
+        data_after: true,
+        created_at: true,
+        actor: { select: { name: true } },
+      },
+    });
+
+    return logs.map(l => ({
+      id: l.id,
+      action: (l.metadata as Record<string, string>)?.action_label ?? l.action,
+      detail: (l.metadata as Record<string, string>)?.detail ?? '',
+      actor: l.actor?.name ?? 'Sistema',
+      ts: l.created_at.toISOString(),
+      data_before: l.data_before,
+      data_after: l.data_after,
+    }));
   }
 }

@@ -610,10 +610,38 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
   const [showSolicitarExame, setShowSolicitarExame] = useState(false);
   // Task 3: smart CID from IA extraction
   const [smartCidSuggestions, setSmartCidSuggestions] = useState<{ code: string; label: string }[]>([]);
-  // Task 6: session audit log
-  const [auditLog, setAuditLog] = useState<{ ts: string; action: string; detail: string }[]>([]);
-  const addAudit = (action: string, detail: string) => {
-    setAuditLog(prev => [{ ts: new Date().toLocaleTimeString('pt-BR'), action, detail }, ...prev].slice(0, 50));
+  // Task 6: audit log — local preview + backend persistence
+  const [auditLog, setAuditLog] = useState<{ ts: string; action: string; detail: string; persisted?: boolean }[]>([]);
+
+  // Load existing audit logs from backend on mount
+  const { data: persistedLogs } = useQuery({
+    queryKey: ['clinical-audit', patient.id],
+    queryFn: () => api.get(`/clinical/audit?patientId=${patient.id}&limit=20`).then(r => r.data).catch(() => []),
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    if (persistedLogs && Array.isArray(persistedLogs) && persistedLogs.length > 0) {
+      setAuditLog(persistedLogs.map((l: any) => ({
+        ts: new Date(l.ts).toLocaleTimeString('pt-BR'),
+        action: l.action,
+        detail: l.detail,
+        persisted: true,
+      })));
+    }
+  }, [persistedLogs]);
+
+  const addAudit = (action: string, detail: string, dataBefore?: Record<string, unknown>, dataAfter?: Record<string, unknown>) => {
+    // Optimistic local update
+    setAuditLog(prev => [{ ts: new Date().toLocaleTimeString('pt-BR'), action, detail, persisted: false }, ...prev].slice(0, 50));
+    // Persist to backend (fire-and-forget — local preview already visible)
+    api.post('/clinical/audit', { patient_id: patient.id, action, detail, data_before: dataBefore, data_after: dataAfter })
+      .then(() => {
+        // Mark as persisted
+        setAuditLog(prev => prev.map((e, i) => i === 0 ? { ...e, persisted: true } : e));
+      })
+      .catch(() => {
+        // Backend unavailable — keep in-memory log, no user-visible error
+      });
   };
 
   // ── Supabase queries ────────────────────────────────────────────────────────
@@ -705,7 +733,7 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
     } catch {
       // fallback: saved locally only — no-op, query will stay stale
     }
-    addAudit('EVOLUÇÃO_REGISTRADA', `CID: ${newEvolucao.cid || 'não informado'}`);
+    addAudit('EVOLUÇÃO_REGISTRADA', `CID: ${newEvolucao.cid || 'não informado'}`, undefined, { cid: newEvolucao.cid, type: newEvolucao.type });
     setNewEvolucao({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
     setShowNewEvolucao(false);
     setActiveTab('evolucoes');
@@ -1532,12 +1560,17 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
         <div className="px-6 pb-4">
           <details>
             <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground select-none">
-              📋 Log de ações desta sessão ({auditLog.length})
+              📋 Log de auditoria clínica ({auditLog.length})
             </summary>
-            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3 space-y-1 max-h-32 overflow-y-auto">
+            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3 space-y-1 max-h-40 overflow-y-auto">
               {auditLog.map((entry, i) => (
-                <p key={i} className="text-[10px] text-muted-foreground">
-                  <span className="font-mono text-foreground">{entry.ts}</span> · <span className="font-medium">{entry.action}</span> — {entry.detail}
+                <p key={i} className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                  <span className="font-mono text-foreground shrink-0">{entry.ts}</span>
+                  <span className="font-medium shrink-0">{entry.action}</span>
+                  <span className="truncate">— {entry.detail}</span>
+                  <span className={`shrink-0 ml-auto text-[9px] ${entry.persisted ? 'text-green-600' : 'text-amber-500'}`}>
+                    {entry.persisted ? '✓ salvo' : '⏳'}
+                  </span>
                 </p>
               ))}
             </div>

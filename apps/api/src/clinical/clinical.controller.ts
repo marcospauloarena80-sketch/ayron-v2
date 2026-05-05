@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -166,5 +166,30 @@ export class ClinicalController {
     @Param('id') id: string,
   ) {
     return this.service.getRecordById(u.clinic_id, id);
+  }
+
+  // ─── Clinical Audit Log ──────────────────────────────────────────────────────
+
+  @Post('audit')
+  logAudit(
+    @CurrentUser() u: RequestUser,
+    @Body() dto: {
+      patient_id: string;
+      action: string;
+      detail: string;
+      data_before?: Record<string, unknown>;
+      data_after?: Record<string, unknown>;
+    },
+  ) {
+    return this.service.logClinicalAction(u.clinic_id, dto.patient_id, u.sub, dto);
+  }
+
+  @Get('audit')
+  getAuditLogs(
+    @CurrentUser() u: RequestUser,
+    @Query('patientId') patientId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getClinicalAuditLogs(u.clinic_id, patientId, limit ? parseInt(limit, 10) : 30);
   }
 }
