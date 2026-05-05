@@ -1054,7 +1054,7 @@ export default function AgendaPage() {
                           <button className="flex w-full items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-primary/5 transition-colors font-medium"
                             onClick={() => {
                               statusMutation.mutate({ id: a.id, status: 'IN_PROGRESS' });
-                              router.push(`/clinical?patientId=${a.patient_id}&patientName=${encodeURIComponent(a.patient?.full_name ?? '')}`);
+                              router.push(`/clinical?patientId=${a.patient_id}&patientName=${encodeURIComponent(a.patient?.full_name ?? '')}&iniciar=true`);
                               setOpenMenuId(null);
                             }}>
                             <UserCheck className="h-3.5 w-3.5" /> Iniciar atendimento

@@ -596,7 +596,11 @@ function ExamStatusBadge({ status, trend }: { status?: string; trend?: string })
 
 function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => void }) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'evolucoes' | 'anamnese' | 'receitas' | 'exames' | 'ia' | 'imagens' | 'telemedicina' | 'bioimpedancia' | 'consulta_ia'>('evolucoes');
+  // Task 7: auto-open consulta_ia when ?iniciar=true in URL
+  const _iniciarFromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('iniciar') : null;
+  const [activeTab, setActiveTab] = useState<'evolucoes' | 'anamnese' | 'receitas' | 'exames' | 'ia' | 'imagens' | 'telemedicina' | 'bioimpedancia' | 'consulta_ia'>(
+    _iniciarFromUrl === 'true' ? 'consulta_ia' : 'evolucoes'
+  );
   const [showEmailProntuario, setShowEmailProntuario] = useState(false);
   const [showNewEvolucao, setShowNewEvolucao] = useState(false);
   const [editingAnamnese, setEditingAnamnese] = useState(false);
@@ -604,6 +608,13 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
   const [newEvolucao, setNewEvolucao] = useState({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
   const [showNovaReceita, setShowNovaReceita] = useState(false);
   const [showSolicitarExame, setShowSolicitarExame] = useState(false);
+  // Task 3: smart CID from IA extraction
+  const [smartCidSuggestions, setSmartCidSuggestions] = useState<{ code: string; label: string }[]>([]);
+  // Task 6: session audit log
+  const [auditLog, setAuditLog] = useState<{ ts: string; action: string; detail: string }[]>([]);
+  const addAudit = (action: string, detail: string) => {
+    setAuditLog(prev => [{ ts: new Date().toLocaleTimeString('pt-BR'), action, detail }, ...prev].slice(0, 50));
+  };
 
   // ── Supabase queries ────────────────────────────────────────────────────────
   const { data: anamneseFromDb } = useQuery({
@@ -652,6 +663,33 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
   const [imgDesc, setImgDesc] = useState('');
   const [imgGroup, setImgGroup] = useState('Geral');
 
+  // Task 3: CID suggestions from IA extraction context
+  const updateCidFromExtraction = (extraction: { queixa_principal?: string; sintomas?: string[] }) => {
+    const CID_MAP: Record<string, { code: string; label: string }> = {
+      'obesidade': { code: 'E66.0', label: 'Obesidade grau II' },
+      'peso': { code: 'E66.0', label: 'Obesidade grau II' },
+      'diabetes': { code: 'E11.9', label: 'DM tipo 2' },
+      'glicemia': { code: 'E11.9', label: 'DM tipo 2' },
+      'hipertensão': { code: 'I10', label: 'Hipertensão arterial' },
+      'pressão': { code: 'I10', label: 'Hipertensão arterial' },
+      'testosterona': { code: 'E29.1', label: 'Hipofunção testicular' },
+      'ovários': { code: 'E28.2', label: 'SOP' },
+      'tireóide': { code: 'E03.9', label: 'Hipotireoidismo' },
+      'colesterol': { code: 'E78.5', label: 'Hiperlipidemia mista' },
+      'resistência insulínica': { code: 'R73.0', label: 'Resistência insulínica' },
+      'fadiga': { code: 'R53', label: 'Fadiga / mal-estar' },
+      'menopausa': { code: 'N95.1', label: 'Menopausa' },
+      'ansiedade': { code: 'F41.1', label: 'Transtorno de ansiedade' },
+    };
+    const fullText = ((extraction.queixa_principal ?? '') + ' ' + (extraction.sintomas ?? []).join(' ')).toLowerCase();
+    const seen = new Set<string>();
+    const suggestions: { code: string; label: string }[] = [];
+    Object.entries(CID_MAP).forEach(([kw, cid]) => {
+      if (fullText.includes(kw) && !seen.has(cid.code)) { suggestions.push(cid); seen.add(cid.code); }
+    });
+    if (suggestions.length > 0) setSmartCidSuggestions(suggestions);
+  };
+
   const submitNovaEvolucao = async () => {
     if (!newEvolucao.subjetivo.trim()) { toast.error('Subjetivo obrigatório'); return; }
     try {
@@ -667,6 +705,7 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
     } catch {
       // fallback: saved locally only — no-op, query will stay stale
     }
+    addAudit('EVOLUÇÃO_REGISTRADA', `CID: ${newEvolucao.cid || 'não informado'}`);
     setNewEvolucao({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
     setShowNewEvolucao(false);
     setActiveTab('evolucoes');
@@ -718,6 +757,29 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                   <span key={p} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{p}</span>
                 ))}
               </div>
+              {/* Task 1: LTV + Ticket Médio — ADMIN/MASTER/GERENTE only */}
+              {(() => {
+                const role = typeof window !== 'undefined' ? (localStorage.getItem('ayron_role') ?? 'MEDICO') : 'MEDICO';
+                if (!['MASTER', 'ADMIN', 'GERENTE'].includes(role)) return null;
+                const mockLtv = 12850; const mockTicket = 428; const clinicAvg = 380;
+                const isAbove = mockTicket >= clinicAvg;
+                return (
+                  <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50">
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground">LTV</p>
+                      <p className="text-sm font-bold">R$ {mockLtv.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div className="w-px h-6 bg-border" />
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground">Ticket Médio</p>
+                      <p className="text-sm font-bold">R$ {mockTicket}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAbove ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {isAbove ? '↑ acima' : '↓ abaixo'} da média
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
           <div className="flex gap-2">
@@ -829,19 +891,22 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                   </div>
                   <div>
                     <label className="text-xs font-bold text-muted-foreground">CID</label>
-                    <input value={newEvolucao.cid} onChange={e => setNewEvolucao(v => ({ ...v, cid: e.target.value }))}
+                    <input value={newEvolucao.cid}
+                      onChange={e => { setNewEvolucao(v => ({ ...v, cid: e.target.value })); if (e.target.value) addAudit('CID_ALTERADO', e.target.value); }}
                       placeholder="Ex.: E66.0" className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-primary/30" />
                     {newEvolucao.cid === '' && (
                       <div className="mt-1.5">
-                        <p className="text-[10px] text-muted-foreground mb-1">Sugestões (baseado em histórico):</p>
+                        <p className="text-[10px] text-muted-foreground mb-1">
+                          Sugestões {smartCidSuggestions.length > 0 ? <span className="text-primary">✨ baseado na Consulta IA</span> : '(baseado em histórico)'}:
+                        </p>
                         <div className="flex gap-1.5 flex-wrap">
-                          {[
+                          {(smartCidSuggestions.length > 0 ? smartCidSuggestions : [
                             { code: 'E66.0', label: 'Obesidade grau II' },
                             { code: 'E11.9', label: 'DM tipo 2' },
                             { code: 'I10', label: 'Hipertensão arterial' },
                             { code: 'E29.1', label: 'Hipofunção testicular' },
                             { code: 'E28.2', label: 'Síndrome dos ovários policísticos' },
-                          ].map(({ code, label }) => (
+                          ]).map(({ code, label }) => (
                             <button
                               key={code}
                               type="button"
@@ -1040,6 +1105,23 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="text-sm font-semibold">{ex.name}</p>
                         <ExamStatusBadge status={ex.status} />
+                        {/* Task 4: exam comparison trend */}
+                        {(() => {
+                          const prev = (exames as any[]).filter((e: any) => e.name === ex.name && e.id !== ex.id)
+                            .sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime())[0];
+                          if (!prev || !ex.ai_data || !prev.ai_data) return null;
+                          const cv = parseFloat(ex.ai_data[0]?.valor?.replace(',', '.'));
+                          const pv = parseFloat(prev.ai_data[0]?.valor?.replace(',', '.'));
+                          if (isNaN(cv) || isNaN(pv)) return null;
+                          const d = cv - pv;
+                          const icon = d < 0 ? '📉' : d > 0 ? '📈' : '➖';
+                          const color = d < 0 ? 'text-green-600' : d > 0 ? 'text-red-600' : 'text-muted-foreground';
+                          return (
+                            <span className={`text-[10px] ${color}`} title={`Anterior (${prev.data}): ${pv}`}>
+                              {icon} vs {prev.data}
+                            </span>
+                          );
+                        })()}
                         {ex.ai_data && (
                           <span className="flex items-center gap-0.5 text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
                             <Brain className="h-2.5 w-2.5" />AYRON
@@ -1385,6 +1467,36 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
                       </div>
                     ))}
                   </div>
+                  {/* Task 5: bioimpedância delta vs previous */}
+                  {i === 0 && BIO_MEASUREMENTS.length >= 2 && (() => {
+                    const curr = BIO_MEASUREMENTS[BIO_MEASUREMENTS.length - 1];
+                    const prev = BIO_MEASUREMENTS[BIO_MEASUREMENTS.length - 2];
+                    const deltas = [
+                      { label: 'Peso', d: curr.peso - prev.peso, unit: 'kg', lowerBetter: true },
+                      { label: '% Gordura', d: curr.gordura - prev.gordura, unit: '%', lowerBetter: true },
+                      { label: 'Músculo', d: curr.musculo - prev.musculo, unit: 'kg', lowerBetter: false },
+                      { label: 'IMC', d: curr.imc - prev.imc, unit: '', lowerBetter: true },
+                    ];
+                    return (
+                      <div className="border-t border-border/50 pt-3">
+                        <p className="text-[10px] font-semibold text-muted-foreground mb-2">vs medição anterior ({prev.data})</p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {deltas.map(({ label, d, unit, lowerBetter }) => {
+                            const improved = lowerBetter ? d < 0 : d > 0;
+                            const color = d === 0 ? 'text-muted-foreground' : improved ? 'text-green-600' : 'text-red-600';
+                            const icon = d === 0 ? '➖' : improved ? '📉' : '📈';
+                            return (
+                              <div key={label} className="text-center p-2 rounded-lg bg-white border border-border/50">
+                                <p className={cn('text-sm font-bold', color)}>{d > 0 ? '+' : ''}{d.toFixed(1)}{unit}</p>
+                                <p className={cn('text-[9px]', color)}>{icon}</p>
+                                <p className="text-[9px] text-muted-foreground">{label}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -1395,21 +1507,43 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
           <ConsultaIATab
             patientId={patient.id}
             patientName={patient.name}
+            patientSex={patient.sex as 'M' | 'F' | undefined}
             onFillEvolution={(data: any) => {
               setNewEvolucao(v => ({ ...v, ...data }));
               setShowNewEvolucao(true);
               setActiveTab('evolucoes');
+              // Task 3: update CID suggestions from extraction context
+              if (data._extraction) updateCidFromExtraction(data._extraction);
+              addAudit('EVOLUÇÃO_PRÉ_PREENCHIDA', 'via Consulta IA');
             }}
             onFillAnamnese={(data: any) => {
               setAnamneseData(v => ({ ...v, ...data }));
               setEditingAnamnese(true);
               setActiveTab('anamnese');
+              addAudit('ANAMNESE_PRÉ_PREENCHIDA', 'via Consulta IA');
             }}
             onOpenReceita={() => { setShowNovaReceita(true); setActiveTab('receitas'); }}
             onOpenExame={() => { setShowSolicitarExame(true); setActiveTab('exames'); }}
           />
         )}
       </div>
+      {/* Task 6: session audit log */}
+      {auditLog.length > 0 && (
+        <div className="px-6 pb-4">
+          <details>
+            <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground select-none">
+              📋 Log de ações desta sessão ({auditLog.length})
+            </summary>
+            <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3 space-y-1 max-h-32 overflow-y-auto">
+              {auditLog.map((entry, i) => (
+                <p key={i} className="text-[10px] text-muted-foreground">
+                  <span className="font-mono text-foreground">{entry.ts}</span> · <span className="font-medium">{entry.action}</span> — {entry.detail}
+                </p>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
       <EmailProntuarioModal open={showEmailProntuario} onClose={() => setShowEmailProntuario(false)} />
       <PrintCenterModal open={showPrintCenter} onClose={() => setShowPrintCenter(false)} patientName={patient.name} />
       <ImportExameModal open={showImportExame} onClose={() => setShowImportExame(false)} onSave={async (ex: any) => {

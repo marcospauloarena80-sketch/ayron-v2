@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 
 // ── Mock patient data (fallback when API offline) ─────────────────────────────
 const MOCK_PATIENTS_LIST = [
-  { id: 'P4821', full_name: 'Ana Lima', birth_date: '1988-03-15', sex: 'F', phone: '(21) 99999-0001', email: 'ana@email.com', current_status: 'CONFIRMADO', tags: ['DIAMANTE'], tier: 'DIAMANTE', days_absent: 12, tipo_contato: 'WHATSAPP', mala_direta: true, next_appointment_date: new Date(Date.now() + 3 * 86400000).toISOString() },
+  { id: 'P4821', full_name: 'Ana Lima', birth_date: '1988-03-15', sex: 'F', phone: '(21) 99999-0001', email: 'ana@email.com', current_status: 'CONFIRMADO', tags: ['DIAMANTE'], tier: 'DIAMANTE', days_absent: 12, tipo_contato: 'WHATSAPP', mala_direta: true, next_appointment_date: new Date(Date.now() + 3 * 86400000).toISOString(), ltv: 12850, attendance_count: 28 },
   { id: 'P3102', full_name: 'Carlos Souza', birth_date: '1979-05-22', sex: 'M', phone: '(21) 99999-0002', email: 'carlos@email.com', current_status: 'AGENDADO', tags: [], tier: 'VIP', days_absent: 92, tipo_contato: 'WHATSAPP', mala_direta: true, next_appointment_date: new Date(Date.now() + 7 * 86400000).toISOString() },
   { id: 'P1089', full_name: 'Beatriz Fernandes', birth_date: '1991-05-08', sex: 'F', phone: '(21) 99999-0003', email: 'bia@email.com', current_status: 'CONFIRMADO', tags: [], tier: 'GOLD', days_absent: 13, tipo_contato: 'EMAIL', mala_direta: true },
   { id: 'P2205', full_name: 'Pedro Gomes', birth_date: '1972-09-14', sex: 'M', phone: '(21) 99999-0004', email: '', current_status: 'INATIVO', tags: [], tier: 'SILVER', days_absent: 180, tipo_contato: 'WHATSAPP', mala_direta: false },
@@ -32,7 +32,7 @@ const MOCK_PATIENTS_LIST = [
   { id: 'P0932', full_name: 'Roberto Alves', birth_date: '1963-04-19', sex: 'M', phone: '(21) 99999-0006', email: '', current_status: 'INATIVO', tags: [], tier: 'VIP', days_absent: 365, tipo_contato: 'SMS', mala_direta: false },
   { id: 'P7731', full_name: 'Camila Dias', birth_date: '1985-04-02', sex: 'F', phone: '(21) 99999-0007', email: 'camila@email.com', current_status: 'INATIVO', tags: ['APENAS_CONSULTA'], tier: 'SILVER', days_absent: 400, tipo_contato: 'WHATSAPP', mala_direta: true },
   { id: 'P6621', full_name: 'Fernanda Lima', birth_date: '1991-12-20', sex: 'F', phone: '(21) 99999-0008', email: '', current_status: 'AGUARDANDO_AGENDAMENTO', tags: [], tier: 'BRONZE', days_absent: 53, tipo_contato: 'WHATSAPP', mala_direta: false },
-  { id: 'P3390', full_name: 'Lucas Prado', birth_date: '1990-07-04', sex: 'M', phone: '(21) 99999-0009', email: 'lucas@email.com', current_status: 'CONFIRMADO', tags: [], tier: 'GOLD', days_absent: 8, tipo_contato: 'EMAIL', mala_direta: true, next_appointment_date: new Date(Date.now() + 1 * 86400000).toISOString() },
+  { id: 'P3390', full_name: 'Lucas Prado', birth_date: '1990-07-04', sex: 'M', phone: '(21) 99999-0009', email: 'lucas@email.com', current_status: 'CONFIRMADO', tags: [], tier: 'GOLD', days_absent: 8, tipo_contato: 'EMAIL', mala_direta: true, next_appointment_date: new Date(Date.now() + 1 * 86400000).toISOString(), ltv: 8400, attendance_count: 22 },
   { id: 'P8812', full_name: 'Juliana Rocha', birth_date: '1984-02-14', sex: 'F', phone: '(21) 99999-0010', email: 'ju@email.com', current_status: 'NOVA_LEAD', tags: [], tier: 'BRONZE', days_absent: 0, tipo_contato: 'INSTAGRAM', mala_direta: false },
 ];
 
@@ -443,9 +443,23 @@ function PatientCard({
               🤝 Indicado por: <span className="text-primary font-medium underline-offset-2 hover:underline">{patient.indicado_por}</span>
             </button>
           )}
-          {hasManagerAccess && patient.ltv && (
-            <p className="text-[10px] text-muted-foreground">💰 LTV: <span className="text-foreground font-medium">R$ {Number(patient.ltv).toLocaleString('pt-BR')}</span></p>
-          )}
+          {hasManagerAccess && patient.ltv && (() => {
+            const ltv = Number(patient.ltv);
+            const attendances = (patient as any).attendance_count ?? Math.max(1, Math.round(ltv / 420));
+            const ticket = Math.round(ltv / attendances);
+            const clinicAvg = 380;
+            const isAbove = ticket >= clinicAvg;
+            return (
+              <p className="text-[10px] text-muted-foreground">
+                💰 LTV: <span className="text-foreground font-medium">R$ {ltv.toLocaleString('pt-BR')}</span>
+                <span className="mx-1 text-border">·</span>
+                Ticket: <span className="text-foreground font-medium">R$ {ticket}</span>
+                <span className={`ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isAbove ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {isAbove ? '↑ acima' : '↓ abaixo'} da média
+                </span>
+              </p>
+            );
+          })()}
         </div>
       )}
       {/* Sem próxima consulta — active patients without next appointment */}

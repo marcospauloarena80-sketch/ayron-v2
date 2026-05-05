@@ -42,6 +42,7 @@ interface SessionData {
 interface ConsultaIATabProps {
   patientId: string;
   patientName: string;
+  patientSex?: 'M' | 'F';
   onFillEvolution: (data: { subjetivo: string; objetivo: string; avaliacao: string; plano: string }) => void;
   onFillAnamnese: (data: { queixa: string; habitos: string }) => void;
   onOpenReceita: () => void;
@@ -57,7 +58,16 @@ const PENDENCIA_LABELS: Record<string, string> = {
   alergias: 'Alergias/intolerâncias',
   medicamentos: 'Medicamentos em uso',
   libido: 'Libido / vida sexual',
+  ciclo_menstrual: 'Ciclo menstrual',
+  metodo_contraceptivo: 'Método contraceptivo',
+  queda_cabelo: 'Queda de cabelo',
+  pele_unhas: 'Pele / unhas',
+  efeitos_colaterais: 'Efeitos colaterais',
+  antecedentes: 'Antecedentes ginecológicos/urológicos',
 };
+
+const CHECKLIST_BASE = ['sono', 'intestino', 'atividade_fisica', 'alergias', 'medicamentos', 'libido', 'queda_cabelo', 'pele_unhas', 'efeitos_colaterais'];
+const CHECKLIST_FEMALE_EXTRA = ['ciclo_menstrual', 'metodo_contraceptivo', 'antecedentes'];
 
 const SPEAKER_STYLES: Record<TranscriptSegment['speaker'], string> = {
   doctor: 'bg-primary/10 text-primary self-end ml-auto border border-primary/20',
@@ -76,6 +86,7 @@ const SPEAKER_LABELS: Record<TranscriptSegment['speaker'], string> = {
 export function ConsultaIATab({
   patientId,
   patientName: _patientName,
+  patientSex,
   onFillEvolution,
   onFillAnamnese,
   onOpenReceita,
@@ -306,19 +317,33 @@ export function ConsultaIATab({
             </div>
           )}
 
-          {extraction.pendencias?.length > 0 && (
-            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
-              <p className="text-[10px] font-semibold text-amber-800 mb-1.5 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Pendências não abordadas
-              </p>
-              <div className="space-y-1">
-                {extraction.pendencias.map((p, i) => (
-                  <p key={i} className="text-xs text-amber-700">⚠️ {PENDENCIA_LABELS[p] ?? p}</p>
-                ))}
+          {(() => {
+            const checklist = patientSex === 'F'
+              ? [...CHECKLIST_BASE, ...CHECKLIST_FEMALE_EXTRA]
+              : CHECKLIST_BASE;
+            const coveredInPatterns = Object.keys(extraction.padroes ?? {}).filter(
+              k => !!(extraction.padroes as Record<string, string | undefined>)[k]
+            );
+            const backendPending = extraction.pendencias ?? [];
+            const extraMissed = checklist.filter(
+              item => !backendPending.includes(item) && !coveredInPatterns.includes(item)
+            );
+            const effectivePending = [...new Set([...backendPending, ...extraMissed])];
+            if (effectivePending.length === 0) return null;
+            return (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+                <p className="text-[10px] font-semibold text-amber-800 mb-1.5 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Checklist clínico — itens não abordados ({effectivePending.length})
+                </p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                  {effectivePending.map((p, i) => (
+                    <p key={i} className="text-xs text-amber-700">⚠️ {PENDENCIA_LABELS[p] ?? p}</p>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
