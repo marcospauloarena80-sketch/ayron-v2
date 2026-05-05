@@ -119,9 +119,8 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // Default to MASTER mock so UI always has a user in dev/test
-      user: MOCK_USERS_BY_ROLE.MASTER,
-      token: 'test-token-bypass',
+      user: null,
+      token: null,
       setAuth: (user, token) => set({ user, token }),
       logout: () => {
         if (typeof document !== 'undefined') {

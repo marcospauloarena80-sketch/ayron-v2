@@ -24,11 +24,32 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
+  async (err) => {
+    const status = err.response?.status;
+
+    if (status === 401 && typeof window !== 'undefined') {
       useAuthStore.getState().logout();
       window.location.href = '/login';
+      return Promise.reject(err);
     }
+
+    if (status === 403 && typeof window !== 'undefined') {
+      // Lazy import to avoid circular deps
+      const { toast } = await import('sonner');
+      toast.error('Sem permissão para realizar esta ação.');
+    }
+
+    if (status != null && status >= 500 && typeof window !== 'undefined') {
+      const { toast } = await import('sonner');
+      toast.error('Erro no servidor. Tente novamente em instantes.');
+    }
+
+    if (!err.response && typeof window !== 'undefined') {
+      // Network error / backend unreachable
+      const { toast } = await import('sonner');
+      toast.error('Não foi possível conectar ao servidor.');
+    }
+
     return Promise.reject(err);
   },
 );

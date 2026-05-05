@@ -176,26 +176,14 @@ function LoginForm() {
   const onSubmit = async (data: FormData) => {
     setError(null);
 
-    // DEV BYPASS
-    if (data.email === 'master@ayron.health' && data.password === 'Ayron@Master2025!') {
-      const mockToken = 'dev-bypass-token';
-      const mockUser = {
-        id: '00000000-0000-0000-0000-000000000003',
-        name: 'MASTER Admin',
-        email: 'master@ayron.health',
-        role: 'MASTER' as const,
-        clinic_id: '00000000-0000-0000-0000-000000000002',
-        permissions: ['*'] as string[],
-        preferences: { theme: 'light' as const, language: 'pt-BR' as const, notifications: true, emailDigest: false },
-      };
-      setAuth(mockUser, mockToken);
-      document.cookie = `ayron_token=${mockToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-      router.push('/dashboard');
-      return;
-    }
-
     try {
-      const supabase = createClient();
+      let supabase;
+      try {
+        supabase = createClient();
+      } catch {
+        setError('Sistema não configurado. Contacte o suporte.');
+        return;
+      }
       const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
