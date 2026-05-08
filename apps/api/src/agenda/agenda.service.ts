@@ -185,6 +185,97 @@ export class AgendaService {
     return updated;
   }
 
+  async createRecurring(clinicId: string, dto: any, actorId: string) {
+    const [hh, mm] = String(dto.time).split(':').map(Number);
+    if (Number.isNaN(hh) || Number.isNaN(mm)) {
+      throw new BadRequestException('Invalid time format (expected HH:mm)');
+    }
+    const interval = dto.interval_weeks ?? 1;
+    const start = new Date(dto.start_date + 'T00:00:00');
+    const end = dto.months_count
+      ? new Date(start.getFullYear(), start.getMonth() + dto.months_count, start.getDate())
+      : null;
+    const targetCount = dto.occurrences_count ?? 9999;
+
+    const slots: { start: Date; end: Date }[] = [];
+    const cursor = new Date(start);
+    let weekIndex = 0;
+    let scanned = 0;
+    while (slots.length < targetCount && scanned < 365 * 2) {
+      const weekStart = new Date(cursor);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
+      if (weekIndex % interval === 0) {
+        for (const wd of dto.weekdays as number[]) {
+          const d = new Date(weekStart);
+          d.setDate(d.getDate() + wd);
+          if (d < start) continue;
+          if (end && d >= end) continue;
+          d.setHours(hh, mm, 0, 0);
+          const e = new Date(d.getTime() + dto.duration_min * 60_000);
+          slots.push({ start: d, end: e });
+          if (slots.length >= targetCount) break;
+        }
+      }
+      cursor.setDate(cursor.getDate() + 7);
+      weekIndex++;
+      scanned += 7;
+      if (end && cursor >= end) break;
+    }
+
+    if (!slots.length) throw new BadRequestException('No occurrences derived from input');
+
+    // Bulk conflict check + create. Skip slots that conflict; report them.
+    const created: any[] = [];
+    const skipped: { start: string; reason: string }[] = [];
+    for (const slot of slots) {
+      const conflict = await this.prisma.appointment.findFirst({
+        where: {
+          clinic_id: clinicId,
+          professional_id: dto.professional_id,
+          deleted_at: null,
+          status: { notIn: ['CANCELLED', 'MISSED', 'RESCHEDULED'] },
+          AND: [{ start_time: { lt: slot.end } }, { end_time: { gt: slot.start } }],
+        },
+        select: { id: true },
+      });
+      if (conflict) {
+        skipped.push({ start: slot.start.toISOString(), reason: 'conflict' });
+        continue;
+      }
+      const appt = await this.prisma.appointment.create({
+        data: {
+          clinic_id: clinicId,
+          patient_id: dto.patient_id,
+          professional_id: dto.professional_id,
+          service_id: dto.service_id,
+          type: dto.type,
+          status: 'SCHEDULED',
+          start_time: slot.start,
+          end_time: slot.end,
+          notes: dto.notes,
+          is_telemedicine: dto.is_telemedicine ?? false,
+        },
+        select: { id: true, start_time: true, end_time: true, status: true },
+      });
+      created.push(appt);
+    }
+
+    if (created.length) {
+      await this.audit.log({
+        clinic_id: clinicId, actor_id: actorId, action: 'CREATE',
+        entity_type: 'Appointment', entity_id: created[0].id,
+        data_after: { recurring_count: created.length, skipped: skipped.length },
+      });
+      await this.events.emit({
+        clinic_id: clinicId, event_type: 'appointment.recurring_created',
+        entity_type: 'Appointment', entity_id: created[0].id, actor_id: actorId,
+        payload: { count: created.length, skipped: skipped.length },
+      });
+    }
+
+    return { created, skipped, count: created.length };
+  }
+
   async bulkUpdateStatus(clinicId: string, ids: string[], status: string, actorId: string) {
     if (!ids?.length) return { updated: 0 };
     const result = await this.prisma.appointment.updateMany({

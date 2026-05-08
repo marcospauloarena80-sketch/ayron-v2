@@ -260,30 +260,25 @@ export function NewAppointmentModal({ open, onClose, preselectedPatientId, prese
       };
 
       if (recDays.length === 0) {
-        const start = new Date(date + 'T00:00:00');
-        start.setHours(h, m, 0, 0);
-        const end = new Date(start.getTime() + durationMin * 60 * 1000);
         const apptData = buildAppt(date, selectedSlot!);
-        await insertAppointment({ ...apptData, start_time: start.toISOString(), end_time: end.toISOString() });
+        await api.post('/agenda', apptData);
         return { created: 1, skipped: 0, firstName: patient?.full_name };
       }
 
-      // Recurring: iterate days over recMonths
-      const rangeEnd = addMonths(new Date(date + 'T00:00:00'), recMonths);
-      let cursor = addDays(new Date(date + 'T00:00:00'), 1);
-      let created = 0, skipped = 0;
-
-      while (cursor <= rangeEnd) {
-        if (recDays.includes(cursor.getDay())) {
-          const d = format(cursor, 'yyyy-MM-dd');
-          try {
-            await insertAppointment(buildAppt(d, selectedSlot!));
-            created++;
-          } catch { skipped++; }
-        }
-        cursor = addDays(cursor, 1);
-      }
-      return { created, skipped, firstName: patient?.full_name };
+      // Recurring: backend POST /agenda/recurring
+      const r = await api.post('/agenda/recurring', {
+        patient_id: patient.id,
+        professional_id: professional.id,
+        service_id: service?.id ?? undefined,
+        type,
+        start_date: date,
+        time: selectedSlot!,
+        duration_min: durationMin,
+        weekdays: recDays,
+        months_count: recMonths,
+        notes: [procedureSubtype ? `[${procedureSubtype}]` : '', notes].filter(Boolean).join(' ') || undefined,
+      }).then(res => res.data);
+      return { created: r.count ?? r.created?.length ?? 0, skipped: r.skipped?.length ?? 0, firstName: patient?.full_name };
     },
     onSuccess: (r: any) => {
       if (r.created === 1 && r.skipped === 0 && recDays.length === 0) {

@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsDateString, IsEnum, IsArray } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsDateString, IsEnum, IsArray, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PatientStatus, PatientTag } from '@prisma/client';
 
@@ -62,4 +62,27 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  tier?: string;
+
+  @IsOptional()
+  @IsString()
+  origin?: string;
+
+  @IsOptional()
+  @IsString()
+  referred_by?: string;
+
+  @IsOptional()
+  metadata?: Record<string, any>;
+
+  @IsOptional()
+  @IsBoolean()
+  lgpd_consent?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  lgpd_consent_at?: string;
 }

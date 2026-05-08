@@ -98,6 +98,9 @@ export class PatientsService {
         cpf: encryptedCpf,
         cpf_search_hash: cpfSearchHash,
         phone: encryptedPhone ?? dto.phone,
+        lgpd_consent_at: dto.lgpd_consent_at
+          ? new Date(dto.lgpd_consent_at)
+          : (dto.lgpd_consent ? new Date() : undefined),
       },
     });
     await Promise.all([
@@ -117,6 +120,11 @@ export class PatientsService {
     }
     if (dto.phone) {
       data.phone = this.crypto.encrypt(dto.phone);
+    }
+    if (dto.lgpd_consent_at) {
+      data.lgpd_consent_at = new Date(dto.lgpd_consent_at);
+    } else if (dto.lgpd_consent && !patient.lgpd_consent) {
+      data.lgpd_consent_at = new Date();
     }
     const updated = await this.prisma.patient.update({ where: { id }, data });
     await Promise.all([

@@ -4,6 +4,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AgendaService } from './agenda.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { CreateRecurringAppointmentsDto } from './dto/create-recurring.dto';
 import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
 import { AppointmentStatus } from '@prisma/client';
 import { IsString, IsOptional } from 'class-validator';
@@ -89,6 +90,11 @@ export class AgendaController {
   @Post('bulk-confirm')
   bulkConfirm(@CurrentUser() u: RequestUser, @Body() dto: { ids: string[] }) {
     return this.service.bulkUpdateStatus(u.clinic_id, dto.ids, 'CONFIRMED', u.sub);
+  }
+
+  @Post('recurring')
+  createRecurring(@CurrentUser() u: RequestUser, @Body() dto: CreateRecurringAppointmentsDto) {
+    return this.service.createRecurring(u.clinic_id, dto, u.sub);
   }
 
   @Post(':id/start')

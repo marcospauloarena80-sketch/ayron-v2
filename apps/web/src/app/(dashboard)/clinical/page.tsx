@@ -34,6 +34,34 @@ import { BriefingCard } from '@/components/clinical/briefing-card';
 import { PreConsultaPanel } from '@/components/clinical/pre-consulta-panel';
 import { ConsultaIATab } from '@/components/clinical/consulta-ia-tab';
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface ClinicalPatient {
+  id: string;
+  name: string;
+  age?: number;
+  avatar?: string;
+  tier?: string;
+  risk?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  tags?: string[];
+  lastVisit?: string;
+  [k: string]: any;
+}
+
+interface EvolutionRecord {
+  id: string;
+  date: string;
+  medico: string;
+  type: string;
+  cid: string;
+  subjetivo: string;
+  objetivo: string;
+  avaliacao: string;
+  plano: string;
+  ai_summary?: string | null;
+  [k: string]: any;
+}
+
 // ── Mock patients for prontuário hub ──────────────────────────────────────────
 
 const MOCK_PATIENTS_CLINICAL = [
@@ -983,7 +1011,7 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
               </div>
             )}
 
-            {evolucoes.map(ev => (
+            {(evolucoes as EvolutionRecord[]).map((ev: EvolutionRecord) => (
               <div key={ev.id} className="rounded-xl border border-border bg-white p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -1739,7 +1767,7 @@ export default function ClinicalHubPage() {
 
         {/* Patient list */}
         <div className="space-y-2">
-          {filtered.map(p => (
+          {(filtered as ClinicalPatient[]).map((p: ClinicalPatient) => (
             <motion.button
               key={p.id}
               initial={{ opacity: 0, y: 4 }}

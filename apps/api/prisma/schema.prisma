@@ -651,6 +651,13 @@ model Patient {
   current_status   PatientStatus                @default(NOVA_LEAD)
   // cognitive_vector Unsupported("vector(1536)")? -- requires pgvector, deferred
   tags             PatientTag[]                 @default([])
+  tier             String?                      // BRONZE | SILVER | GOLD | VIP | PLATINA | DIAMANTE
+  origin           String?                      // tipo_contato/conheceu_por canalizado
+  referred_by      String?                      // indicado_por (free-text)
+  metadata         Json?                        // empresa, referencia, estado_civil, profissao, etc.
+  lgpd_consent     Boolean                      @default(false)
+  lgpd_consent_at  DateTime?
+  last_appointment_at DateTime?
   notes            String?
   is_active        Boolean                      @default(true)
   created_at       DateTime                     @default(now())
