@@ -1,8 +1,14 @@
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
--- CreateExtension
-CREATE EXTENSION IF NOT EXISTS "vector";
+-- CreateExtension (graceful fallback if pgvector not installed on host)
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS "vector";
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pgvector extension not available on this host, skipping vector support';
+END
+$$;
 
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('MASTER', 'GERENTE', 'MEDICO', 'ENFERMEIRA', 'TECNICA', 'CONCIERGE', 'ADMINISTRATIVO', 'FINANCEIRO');
