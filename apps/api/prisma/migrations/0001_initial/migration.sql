@@ -195,7 +195,7 @@ CREATE TABLE "patients" (
     "risk_score" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "risk_level" "PatientRiskLevel" NOT NULL DEFAULT 'PREVENTIVO',
     "current_status" "PatientStatus" NOT NULL DEFAULT 'NOVA_LEAD',
-    "cognitive_vector" vector(1536),
+    -- "cognitive_vector" vector(1536), -- requires pgvector, deferred
     "notes" TEXT,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -657,7 +657,7 @@ CREATE TABLE "cognitive_memory" (
     "patient_id" TEXT,
     "memory_type" "MemoryType" NOT NULL,
     "memory_text" TEXT NOT NULL,
-    "embedding" vector(1536),
+    -- "embedding" vector(1536), -- requires pgvector, deferred
     "relevance_score" DOUBLE PRECISION NOT NULL DEFAULT 0.5,
     "source_events" JSONB,
     "is_active" BOOLEAN NOT NULL DEFAULT true,

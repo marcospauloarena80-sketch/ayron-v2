@@ -6,14 +6,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  extensions = [pgvector(map: "vector")]
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -651,7 +649,7 @@ model Patient {
   risk_score       Float                        @default(0)
   risk_level       PatientRiskLevel             @default(PREVENTIVO)
   current_status   PatientStatus                @default(NOVA_LEAD)
-  cognitive_vector Unsupported("vector(1536)")?
+  // cognitive_vector Unsupported("vector(1536)")? -- requires pgvector, deferred
   tags             PatientTag[]                 @default([])
   notes            String?
   is_active        Boolean                      @default(true)
@@ -1464,7 +1462,7 @@ model CognitiveMemory {
   patient_id      String?
   memory_type     MemoryType
   memory_text     String
-  embedding       Unsupported("vector(1536)")?
+  // embedding       Unsupported("vector(1536)")? -- requires pgvector, deferred
   relevance_score Float                        @default(0.5)
   source_events   Json?
   is_active       Boolean                      @default(true)
