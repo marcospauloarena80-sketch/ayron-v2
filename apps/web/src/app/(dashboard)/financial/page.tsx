@@ -935,13 +935,13 @@ function LancamentosTab() {
   const [showDefinirPago, setShowDefinirPago] = useState(false);
   const ofxRef = useRef<HTMLInputElement>(null);
 
-  const { data: lancamentosDB = MOCK_LANCAMENTOS } = useQuery({
+  const { data: lancamentosDB = [] } = useQuery({
     queryKey: ['financial-transactions', from, to, tipoFilter],
     queryFn: () => fetchFinancialTransactions({
       from: from || undefined,
       to: to || undefined,
       tipo: tipoFilter || undefined,
-    }).catch(() => MOCK_LANCAMENTOS),
+    }).catch(() => []),
     staleTime: 30_000,
   });
 
@@ -2058,149 +2058,24 @@ function SessoesTab() {
 
 // ── Pagamentos Stone ──────────────────────────────────────────────────────────
 
-const MOCK_STONE = [
-  { id: 'ST001', patient: 'Ana Lima', date: '2026-04-24', status: 'APROVADO', tid: 'TID-20240424-001', value: 850 },
-  { id: 'ST002', patient: 'Carlos Souza', date: '2026-04-23', status: 'PENDENTE', tid: 'TID-20240423-002', value: 600 },
-  { id: 'ST003', patient: 'Beatriz Fernandes', date: '2026-04-22', status: 'APROVADO', tid: 'TID-20240422-003', value: 650 },
-  { id: 'ST004', patient: 'Pedro Gomes', date: '2026-04-20', status: 'CANCELADO', tid: 'TID-20240420-004', value: 450 },
-];
-
 function StoneTab() {
-  const [search, setSearch] = useState('');
-  const filtered = MOCK_STONE.filter(s => !search || s.patient.toLowerCase().includes(search.toLowerCase()));
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar nome do paciente..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-border text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-        </div>
-        <Button size="sm" variant="secondary" onClick={() => toast.info('Atualizando...')}><RefreshCw className="h-3.5 w-3.5 mr-1" />Atualizar</Button>
-      </div>
-
-      <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 flex items-center gap-2">
-        <CreditCard className="h-4 w-4 text-orange-600 shrink-0" />
-        <p className="text-xs text-orange-700">Web Pagamentos Stone — integração via API Stone. Configure as credenciais em Configurações → Integrações.</p>
-      </div>
-
-      <div className="rounded-lg border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              {['Nome do Paciente', 'Data', 'Status', 'TID', 'Valor'].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {filtered.length === 0 ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Nenhum pagamento encontrado.</td></tr>
-            ) : filtered.map(s => (
-              <tr key={s.id} className="hover:bg-muted/30">
-                <td className="px-3 py-2.5 font-medium">{s.patient}</td>
-                <td className="px-3 py-2.5 text-muted-foreground">{fmtDate(s.date)}</td>
-                <td className="px-3 py-2.5">
-                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
-                    s.status === 'APROVADO' ? 'bg-green-100 text-green-800' :
-                    s.status === 'PENDENTE' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800')}>
-                    {s.status}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{s.tid}</td>
-                <td className="px-3 py-2.5 font-medium">{fmt(s.value)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+      <CreditCard className="h-10 w-10 text-muted-foreground/40" />
+      <p className="font-medium text-muted-foreground">Integração Stone não configurada</p>
+      <p className="text-sm text-muted-foreground/70 max-w-xs">Configure as credenciais da API Stone em Configurações → Integrações para habilitar pagamentos.</p>
     </div>
   );
 }
 
 // ── Guia TISS ─────────────────────────────────────────────────────────────────
 
-const MOCK_TISS = [
-  { id: 'T001', patient: 'Ana Lima', convenio: 'Unimed', data_consulta: '2026-04-24', created_at: '2026-04-24', status: 'ENVIADA' },
-  { id: 'T002', patient: 'Carlos Souza', convenio: 'Bradesco', data_consulta: '2026-04-23', created_at: '2026-04-23', status: 'PENDENTE' },
-  { id: 'T003', patient: 'Beatriz Fernandes', convenio: 'Unimed', data_consulta: '2026-04-20', created_at: '2026-04-21', status: 'APROVADA' },
-];
-
 function TissTab() {
-  const [search, setSearch] = useState('');
-  const [showNovaGuia, setShowNovaGuia] = useState(false);
-  const [selectedGuia, setSelectedGuia] = useState<any>(null);
-  const filtered = MOCK_TISS.filter(t => !search || t.patient.toLowerCase().includes(search.toLowerCase()) || t.convenio.toLowerCase().includes(search.toLowerCase()));
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar paciente ou convênio..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-border text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-        </div>
-        <Button size="sm" variant="secondary" onClick={() => toast.info('Voltar')}><ChevronLeft className="h-3.5 w-3.5 mr-1" />Voltar</Button>
-        <Button size="sm" onClick={() => setShowNovaGuia(true)}><Plus className="h-3.5 w-3.5 mr-1" />Nova Guia</Button>
-      </div>
-
-      <div className="rounded-lg border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              {['Paciente', 'Convênio', 'Data da Consulta', 'Data de Criação', 'Status', 'Visualizar'].map(h => (
-                <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {filtered.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Nenhuma guia.</td></tr>
-            ) : filtered.map(t => (
-              <tr key={t.id} className="hover:bg-muted/30">
-                <td className="px-3 py-2.5 font-medium">{t.patient}</td>
-                <td className="px-3 py-2.5 text-muted-foreground">{t.convenio}</td>
-                <td className="px-3 py-2.5 text-muted-foreground">{fmtDate(t.data_consulta)}</td>
-                <td className="px-3 py-2.5 text-muted-foreground">{fmtDate(t.created_at)}</td>
-                <td className="px-3 py-2.5">
-                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
-                    t.status === 'APROVADA' ? 'bg-green-100 text-green-800' :
-                    t.status === 'ENVIADA' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}>
-                    {t.status}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5">
-                  <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setSelectedGuia(t)}>
-                    <FileText className="h-3 w-3 mr-1" />Ver
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Dialog open={showNovaGuia} onClose={() => setShowNovaGuia(false)} title="Nova Guia TISS" size="md">
-        <div className="space-y-3">
-          <Input label="Paciente *" placeholder="Buscar paciente..." />
-          <Select label="Convênio *"><option>Unimed</option><option>Bradesco</option><option>Amil</option><option>SulAmérica</option></Select>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Data da Consulta *" type="date" />
-            <Input label="Carteirinha" placeholder="Nº da carteirinha" />
-          </div>
-          <Select label="Tipo de Guia"><option>Consulta</option><option>SADT</option><option>Internação</option><option>Honorário</option></Select>
-          <Input label="CID" placeholder="Código CID-10" />
-          <textarea placeholder="Observações..." rows={2}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
-        </div>
-        <DialogFooter className="mt-4">
-          <Button variant="ghost" onClick={() => setShowNovaGuia(false)}>Cancelar</Button>
-          <Button onClick={() => { toast.success('Guia TISS criada'); setShowNovaGuia(false); }}>Criar Guia</Button>
-        </DialogFooter>
-      </Dialog>
-
-      {selectedGuia && <TissViewModal guia={selectedGuia} onClose={() => setSelectedGuia(null)} />}
+    <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+      <FileText className="h-10 w-10 text-muted-foreground/40" />
+      <p className="font-medium text-muted-foreground">Integração TISS não configurada</p>
+      <p className="text-sm text-muted-foreground/70 max-w-xs">Configure a integração com convênios em Configurações → Integrações para habilitar guias TISS.</p>
     </div>
   );
 }

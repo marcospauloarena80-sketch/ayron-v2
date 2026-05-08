@@ -655,9 +655,22 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
     if (anamneseFromDb) setAnamneseData({ ...MOCK_ANAMNESE, ...anamneseFromDb });
   }, [anamneseFromDb]);
 
-  const { data: evolucoes = MOCK_EVOLUCOES } = useQuery({
+  const { data: evolucoes = [] } = useQuery({
     queryKey: ['evolutions', patient.id],
-    queryFn: () => fetchPatientEvolutions(patient.id).catch(() => MOCK_EVOLUCOES),
+    queryFn: () => api.get(`/clinical/patients/${patient.id}/history`)
+      .then(r => (r.data?.records ?? r.data ?? []).map((rec: any) => ({
+        id: rec.id,
+        date: new Date(rec.created_at).toLocaleDateString('pt-BR'),
+        medico: rec.professional?.name ?? '',
+        type: rec.structured_data?.type ?? 'Consulta',
+        cid: rec.structured_data?.cid ?? '',
+        subjetivo: rec.structured_data?.subjetivo ?? rec.transcription ?? '',
+        objetivo: rec.structured_data?.objetivo ?? '',
+        avaliacao: rec.structured_data?.avaliacao ?? '',
+        plano: rec.structured_data?.plano ?? '',
+        ai_summary: rec.summary_ai ?? null,
+      })))
+      .catch(() => []),
     staleTime: 30_000,
   });
 
@@ -721,17 +734,21 @@ function ProntuarioDetail({ patient, onBack }: { patient: any; onBack: () => voi
   const submitNovaEvolucao = async () => {
     if (!newEvolucao.subjetivo.trim()) { toast.error('Subjetivo obrigatório'); return; }
     try {
-      await insertEvolution(patient.id, {
-        type: newEvolucao.type,
-        cid: newEvolucao.cid || 'Não informado',
-        subjetivo: newEvolucao.subjetivo,
-        objetivo: newEvolucao.objetivo,
-        avaliacao: newEvolucao.avaliacao,
-        plano: newEvolucao.plano,
+      await api.post('/clinical/records', {
+        patient_id: patient.id,
+        structured_data: {
+          type: newEvolucao.type,
+          cid: newEvolucao.cid || 'Não informado',
+          subjetivo: newEvolucao.subjetivo,
+          objetivo: newEvolucao.objetivo,
+          avaliacao: newEvolucao.avaliacao,
+          plano: newEvolucao.plano,
+        },
       });
       queryClient.invalidateQueries({ queryKey: ['evolutions', patient.id] });
-    } catch {
-      // fallback: saved locally only — no-op, query will stay stale
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Erro ao salvar evolução');
+      return;
     }
     addAudit('EVOLUÇÃO_REGISTRADA', `CID: ${newEvolucao.cid || 'não informado'}`, undefined, { cid: newEvolucao.cid, type: newEvolucao.type });
     setNewEvolucao({ subjetivo: '', objetivo: '', avaliacao: '', plano: '', cid: '', type: 'Consulta' });
@@ -1622,9 +1639,20 @@ export default function ClinicalHubPage() {
   const [selected, setSelected] = useState<any>(null);
   const [riskFilter, setRiskFilter] = useState<string>('all');
 
-  const { data: allPatients = MOCK_PATIENTS_CLINICAL } = useQuery({
+  const { data: allPatients = [] } = useQuery({
     queryKey: ['clinical-patients', search],
-    queryFn: () => fetchPatientsForClinical(search || undefined).catch(() => MOCK_PATIENTS_CLINICAL),
+    queryFn: () => api.get('/patients', { params: { search: search || undefined, limit: 200 } })
+      .then(r => (r.data?.data ?? r.data ?? []).map((p: any) => ({
+        id: p.id,
+        name: p.full_name ?? p.name ?? '',
+        age: p.birth_date ? Math.floor((Date.now() - new Date(p.birth_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : undefined,
+        avatar: p.avatar_url ?? undefined,
+        tier: p.tier ?? undefined,
+        risk: p.risk_score ?? undefined,
+        tags: p.tags ?? [],
+        lastVisit: p.last_appointment_at ?? p.last_visit ?? undefined,
+      })))
+      .catch(() => []),
     staleTime: 30_000,
   });
 

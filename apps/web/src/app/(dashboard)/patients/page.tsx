@@ -930,8 +930,9 @@ export default function PatientsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['patients', search, page],
     queryFn: () =>
-      fetchPatients({ search: search || undefined, page, limit: PAGE_SIZE })
-        .catch(() => ({ data: MOCK_PATIENTS_LIST, total: MOCK_PATIENTS_LIST.length, totalPages: 1 })),
+      api.get('/patients', { params: { search: search || undefined, page, limit: PAGE_SIZE } })
+        .then(r => r.data)
+        .catch(() => ({ data: [], total: 0, totalPages: 1 })),
     placeholderData: (prev) => prev,
     staleTime: 30_000,
   });
@@ -939,13 +940,13 @@ export default function PatientsPage() {
   // Stats query — busca todos os pacientes para contadores dos quick filters
   const { data: allPatientsData } = useQuery({
     queryKey: ['patients-all-stats'],
-    queryFn: () => fetchAllPatients().catch(() => MOCK_PATIENTS_LIST),
+    queryFn: () => api.get('/patients', { params: { limit: 200 } }).then(r => r.data?.data ?? []).catch(() => []),
     staleTime: 60_000,
   });
-  const allPatients: any[] = allPatientsData ?? MOCK_PATIENTS_LIST;
+  const allPatients: any[] = allPatientsData ?? [];
 
-  const apiPatients: any[] = data?.data ?? MOCK_PATIENTS_LIST;
-  const total: number = data?.total ?? MOCK_PATIENTS_LIST.length;
+  const apiPatients: any[] = data?.data ?? [];
+  const total: number = data?.total ?? 0;
   const totalPages: number = data?.totalPages ?? 1;
 
   const handleSearch = (val: string) => { setSearch(val); setPage(1); };

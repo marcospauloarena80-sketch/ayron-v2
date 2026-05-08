@@ -404,18 +404,18 @@ function ReturnRiskBlock() {
           return { id: p.id, name: p.full_name ?? p.name, daysOverdue, risk: classifyRisk(daysOverdue), reason: p.risk_reason ?? 'Retorno em atraso' };
         }).filter((p: AtRiskPatient) => p.daysOverdue > 0);
       } catch {
-        return MOCK_RETURN_RISK;
+        return [];
       }
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  const patients = (apiPatients && apiPatients.length > 0 ? apiPatients : MOCK_RETURN_RISK)
+  const patients = (apiPatients ?? [])
     .filter(p => filter === 'todos' || p.risk === filter)
     .sort((a, b) => b.daysOverdue - a.daysOverdue)
     .slice(0, 8);
 
-  const counts = (apiPatients && apiPatients.length > 0 ? apiPatients : MOCK_RETURN_RISK).reduce(
+  const counts = (apiPatients ?? []).reduce(
     (acc, p) => { acc[p.risk] = (acc[p.risk] ?? 0) + 1; return acc; },
     {} as Record<ReturnRisk, number>
   );
@@ -692,11 +692,11 @@ function RecentPatientsBlock() {
 
   const { data, isLoading } = useQuery<any[]>({
     queryKey: ['recent-patients'],
-    queryFn: () => api.get('/agenda?status=COMPLETED&limit=5&date=today').then(r => r.data).catch(() => MOCK_RECENT),
+    queryFn: () => api.get('/agenda?status=COMPLETED&limit=5&date=today').then(r => r.data).catch(() => []),
     staleTime: 2 * 60 * 1000,
   });
 
-  const patients = data ?? MOCK_RECENT;
+  const patients = data ?? [];
 
   return (
     <Card>

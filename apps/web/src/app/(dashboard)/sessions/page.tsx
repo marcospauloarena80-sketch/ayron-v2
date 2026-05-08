@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Topbar } from '@/components/layout/topbar';
 import { Button } from '@/components/ui/button';
@@ -164,12 +164,22 @@ function NextSessionBadge({ date }: { date: string | null }) {
 function CheckInModal({ protocol, onClose }: { protocol: Protocol; onClose: () => void }) {
   const [notes, setNotes] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const qc = useQueryClient();
 
   const handleConfirm = async () => {
     setConfirming(true);
-    await new Promise(r => setTimeout(r, 800));
-    toast.success(`Sessão ${protocol.completed_sessions + 1}/${protocol.total_sessions} registrada para ${protocol.patient_name}`);
-    onClose();
+    try {
+      await api.patch(`/clinical/protocols/${protocol.id}`, {
+        status: protocol.status,
+        notes: notes || undefined,
+      });
+      toast.success(`Sessão registrada para ${protocol.patient_name}`);
+      qc.invalidateQueries({ queryKey: ['protocols'] });
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Erro ao registrar sessão');
+      setConfirming(false);
+    }
   };
 
   return (
@@ -234,9 +244,26 @@ export default function SessionsPage() {
   const [checkIn, setCheckIn] = useState<Protocol | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const { data: protocolsData = MOCK_PROTOCOLS, isLoading: loadingProtocols } = useQuery({
+  const { data: protocolsData = [], isLoading: loadingProtocols } = useQuery({
     queryKey: ['protocols'],
-    queryFn: () => fetchProtocols().catch(() => MOCK_PROTOCOLS),
+    queryFn: () => api.get('/clinical/protocols')
+      .then(r => (r.data?.data ?? r.data ?? []).map((p: any) => ({
+        id: p.id,
+        patient_name: p.patient?.full_name ?? '',
+        patient_id: p.patient_id,
+        protocol_name: p.name ?? p.protocol_name ?? 'Protocolo',
+        category: p.category ?? 'Geral',
+        total_sessions: p.total_sessions ?? 0,
+        completed_sessions: p.completed_sessions ?? 0,
+        next_session_date: p.next_session_date ?? null,
+        last_session_date: p.last_session_date ?? null,
+        start_date: p.start_date,
+        status: p.status ?? 'ATIVO',
+        professional: p.professional?.name ?? '',
+        interval_days: p.interval_days ?? 7,
+        notes: p.notes,
+      })))
+      .catch(() => []),
     staleTime: 30_000,
   });
 

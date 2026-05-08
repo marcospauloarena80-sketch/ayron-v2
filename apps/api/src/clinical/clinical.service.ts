@@ -231,6 +231,24 @@ export class ClinicalService {
     return protocol;
   }
 
+  async getAllProtocols(clinicId: string, params?: { status?: string; limit?: number; page?: number }) {
+    const limit = params?.limit ?? 50;
+    const page = params?.page ?? 1;
+    const where: any = { clinic_id: clinicId, deleted_at: null };
+    if (params?.status) where.status = params.status;
+    const [protocols, total] = await Promise.all([
+      this.prisma.treatmentProtocol.findMany({
+        where,
+        include: { patient: { select: { id: true, full_name: true, avatar_url: true } } },
+        orderBy: { start_date: 'desc' },
+        take: limit,
+        skip: (page - 1) * limit,
+      }),
+      this.prisma.treatmentProtocol.count({ where }),
+    ]);
+    return { data: protocols, total, page, limit };
+  }
+
   async getPatientProtocols(clinicId: string, patientId: string) {
     return this.prisma.treatmentProtocol.findMany({
       where: { clinic_id: clinicId, patient_id: patientId, deleted_at: null },

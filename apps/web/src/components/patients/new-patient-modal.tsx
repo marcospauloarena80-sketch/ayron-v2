@@ -303,30 +303,11 @@ export function NewPatientModal({ open, onClose, patient }: Props) {
         },
       };
       if (isEdit) {
-        try {
-          return await updatePatient(patient.id, payload);
-        } catch {
-          return api.patch(`/patients/${patient.id}`, payload).then(r => r.data);
-        }
+        return api.patch(`/patients/${patient.id}`, payload).then(r => r.data);
       }
-      try {
-        return await insertPatient(payload);
-      } catch {
-        return api.post('/patients', payload).then(r => r.data);
-      }
+      return api.post('/patients', { ...payload, lgpd_consent: lgpdConsent }).then(r => r.data);
     },
     onSuccess: async (p: any) => {
-      if (!isEdit && lgpdConsent) {
-        try {
-          const supabase = createClient();
-          await supabase.from('patients').update({
-            lgpd_consent: true,
-            lgpd_consent_at: new Date().toISOString(),
-          }).eq('id', p.id);
-        } catch {
-          // best effort
-        }
-      }
       toast.success(isEdit ? `Paciente ${p.full_name} atualizado` : `Paciente ${p.full_name} criado`);
       qc.invalidateQueries({ queryKey: ['patients'] });
       qc.invalidateQueries({ queryKey: ['patient', patient?.id] });

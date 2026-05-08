@@ -65,6 +65,20 @@ export class ClinicalController {
     return this.service.createProtocol(u.clinic_id, dto, u.sub);
   }
 
+  @Get('protocols')
+  getAllProtocols(
+    @CurrentUser() u: RequestUser,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    return this.service.getAllProtocols(u.clinic_id, {
+      status,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+    });
+  }
+
   @Get('protocols/patient/:patientId')
   getPatientProtocols(@CurrentUser() u: RequestUser, @Param('patientId') patientId: string) {
     return this.service.getPatientProtocols(u.clinic_id, patientId);

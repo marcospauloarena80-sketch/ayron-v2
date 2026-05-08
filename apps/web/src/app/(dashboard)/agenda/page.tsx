@@ -573,10 +573,10 @@ export default function AgendaPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Profissionais do Supabase
+  // Profissionais da API
   const { data: profissionaisDB = [] } = useQuery({
     queryKey: ['professionals'],
-    queryFn: () => fetchProfessionals().catch(() => []),
+    queryFn: () => api.get('/professionals').then(r => r.data?.data ?? r.data ?? []).catch(() => []),
     staleTime: 300_000,
   });
   const PROFESSIONALS_LIST = [
@@ -603,15 +603,18 @@ export default function AgendaPage() {
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['agenda', dateStr],
-    queryFn: () => fetchAppointmentsByDate(dateStr)
-      .then(rows => rows.map((a: any) => ({
-        ...a,
-        patient: { id: a.patient_id, name: a.patients?.full_name ?? '', phone: a.patients?.phone ?? '', tier: a.patients?.tier ?? '' },
-        professional: { id: a.professional_id, name: a.professionals?.name ?? '', color: a.professionals?.color ?? '#6366f1' },
-        time: a.start_time ? new Date(a.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
-        duration: a.end_time && a.start_time ? Math.round((new Date(a.end_time).getTime() - new Date(a.start_time).getTime()) / 60000) : 60,
-        service: { name: a.procedure_name ?? a.type ?? 'Consulta', category: a.type ?? 'CONSULTATION' },
-      })))
+    queryFn: () => api.get('/agenda', { params: { date: dateStr } })
+      .then(r => {
+        const rows = r.data?.data ?? r.data ?? [];
+        return rows.map((a: any) => ({
+          ...a,
+          patient: { id: a.patient_id, name: a.patient?.full_name ?? a.patients?.full_name ?? '', phone: a.patient?.phone ?? a.patients?.phone ?? '', tier: a.patient?.tier ?? a.patients?.tier ?? '' },
+          professional: { id: a.professional_id, name: a.professional?.name ?? a.professionals?.name ?? '', color: a.professional?.color ?? a.professionals?.color ?? '#6366f1' },
+          time: a.start_time ? new Date(a.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+          duration: a.end_time && a.start_time ? Math.round((new Date(a.end_time).getTime() - new Date(a.start_time).getTime()) / 60000) : 60,
+          service: { name: a.procedure_name ?? a.type ?? 'Consulta', category: a.type ?? 'CONSULTATION' },
+        }));
+      })
       .catch(() => []),
     staleTime: 30_000,
   });
