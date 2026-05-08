@@ -615,7 +615,7 @@ function TopTasksBlock() {
       </CardHeader>
       <div className="px-4 pb-4">
         {top10.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma tarefa para hoje. 🎉</p>
+          <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma tarefa pendente.</p>
         ) : (
           <div className="space-y-2">
             {top10.map((task: any, idx: number) => {

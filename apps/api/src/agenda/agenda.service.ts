@@ -185,6 +185,16 @@ export class AgendaService {
     return updated;
   }
 
+  async bulkUpdateStatus(clinicId: string, ids: string[], status: string, actorId: string) {
+    if (!ids?.length) return { updated: 0 };
+    const result = await this.prisma.appointment.updateMany({
+      where: { id: { in: ids }, clinic_id: clinicId, deleted_at: null },
+      data: { status: status as any },
+    });
+    await this.events.emit({ clinic_id: clinicId, event_type: 'appointment.bulk_updated', entity_type: 'Appointment', entity_id: ids[0], actor_id: actorId, payload: { count: result.count, status } });
+    return { updated: result.count };
+  }
+
   async getDailyClosingStatus(clinicId: string, date: string) {
     const d = new Date(date);
     const next = new Date(d);

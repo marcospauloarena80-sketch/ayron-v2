@@ -35,6 +35,18 @@ const fmt = (v: number | string | null | undefined) =>
 const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 
+const mapPaymentMethod = (v: string): string | undefined => {
+  const m: Record<string, string> = {
+    'DINHEIRO': 'CASH', 'CASH': 'CASH',
+    'CARTAO_CREDITO': 'CREDIT_CARD', 'CREDITO': 'CREDIT_CARD', 'CREDIT_CARD': 'CREDIT_CARD',
+    'CARTAO_DEBITO': 'DEBIT_CARD', 'DEBITO': 'DEBIT_CARD', 'DEBIT_CARD': 'DEBIT_CARD',
+    'PIX': 'PIX',
+    'TRANSFERENCIA': 'BANK_TRANSFER', 'BANK_TRANSFER': 'BANK_TRANSFER',
+    'CONVENIO': 'HEALTH_INSURANCE', 'HEALTH_INSURANCE': 'HEALTH_INSURANCE',
+  };
+  return m[v?.toUpperCase()] ?? undefined;
+};
+
 const parseCurrency = (v: string): number => {
   const cleaned = v.replace(/[R$\s.]/g, '').replace(',', '.');
   return parseFloat(cleaned) || 0;
@@ -937,10 +949,29 @@ function LancamentosTab() {
 
   const { data: lancamentosDB = [] } = useQuery({
     queryKey: ['financial-transactions', from, to, tipoFilter],
-    queryFn: () => fetchFinancialTransactions({
-      from: from || undefined,
-      to: to || undefined,
-      tipo: tipoFilter || undefined,
+    queryFn: () => api.get('/financial', {
+      params: {
+        from: from || undefined,
+        to: to || undefined,
+        type: tipoFilter === 'RECEBER' ? 'REVENUE' : tipoFilter === 'PAGAR' ? 'EXPENSE' : undefined,
+        limit: 200,
+      },
+    }).then(r => {
+      const rows = r.data?.data ?? r.data ?? [];
+      return rows.map((t: any) => ({
+        id: t.id,
+        descricao: t.description ?? '',
+        valor: Number(t.amount ?? 0),
+        tipo: t.type === 'REVENUE' ? 'RECEBER' : 'PAGAR',
+        status: t.status === 'COMPLETED' ? 'PAGO' : t.status === 'PENDING' ? 'ABERTO' : t.status,
+        vencimento: t.due_date ?? t.created_at,
+        pago_em: t.paid_at,
+        pago: t.status === 'COMPLETED' ? Number(t.amount ?? 0) : 0,
+        saldo: t.status === 'COMPLETED' ? 0 : Number(t.amount ?? 0),
+        classificacao: t.category,
+        forma_pagamento: t.payment_method,
+        controle: String(t.id).slice(0, 8).toUpperCase(),
+      }));
     }).catch(() => []),
     staleTime: 30_000,
   });
@@ -949,25 +980,22 @@ function LancamentosTab() {
 
   const insertMutation = useMutation({
     mutationFn: (tipo: 'RECEBER' | 'PAGAR') =>
-      insertFinancialTransaction({
-        descricao: formData.descricao,
-        valor: parseFloat(formData.valor || '0'),
-        tipo,
-        vencimento: formData.vencimento,
-        pago_em: formData.pago_em || undefined,
-        classificacao: formData.classificacao || undefined,
-        conta: formData.conta || undefined,
-        filial: formData.filial || undefined,
-        forma_pagamento: formData.forma_pagamento || undefined,
-      }),
-    onSuccess: (_data, tipo) => {
-      toast.success(tipo === 'RECEBER' ? 'Receita lançada ✓' : 'Despesa lançada ✓');
+      api.post('/financial', {
+        type: tipo === 'RECEBER' ? 'REVENUE' : 'EXPENSE',
+        amount: parseFloat(formData.valor || '0'),
+        description: formData.descricao,
+        due_date: formData.vencimento ? new Date(formData.vencimento).toISOString() : undefined,
+        category: formData.classificacao || undefined,
+        payment_method: formData.forma_pagamento ? mapPaymentMethod(formData.forma_pagamento) : undefined,
+      }).then(r => ({ tipo, data: r.data })),
+    onSuccess: ({ tipo }) => {
+      toast.success(tipo === 'RECEBER' ? 'Receita lançada' : 'Despesa lançada');
       queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
       resetForm();
       setShowNovaReceita(false);
       setShowNovaDespesa(false);
     },
-    onError: (e: any) => toast.error(`Erro ao salvar: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(`Erro ao salvar: ${e?.response?.data?.message ?? e?.message ?? String(e)}`),
   });
 
   const filtered = lancamentosDB.filter((l: any) => {
@@ -1053,7 +1081,7 @@ function LancamentosTab() {
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
               <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Nenhum lançamento encontrado.</td></tr>
-            ) : filtered.map(l => (
+            ) : filtered.map((l: any) => (
               <tr key={l.id} onClick={() => setSelected((s: typeof l | null) => s?.id === l.id ? null : l)}
                 className={cn('cursor-pointer hover:bg-muted/30 transition-colors', selected?.id === l.id ? 'bg-primary/5' : '')}>
                 <td className="px-3 py-2.5">

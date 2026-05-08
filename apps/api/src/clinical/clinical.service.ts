@@ -239,7 +239,7 @@ export class ClinicalService {
     const [protocols, total] = await Promise.all([
       this.prisma.treatmentProtocol.findMany({
         where,
-        include: { patient: { select: { id: true, full_name: true, avatar_url: true } } },
+        include: { patient: { select: { id: true, full_name: true } } },
         orderBy: { start_date: 'desc' },
         take: limit,
         skip: (page - 1) * limit,

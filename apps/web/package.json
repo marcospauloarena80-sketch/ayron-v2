@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-query": "^5.62.7",
     "axios": "^1.7.9",
     "caniuse-lite": "^1.0.30001775",

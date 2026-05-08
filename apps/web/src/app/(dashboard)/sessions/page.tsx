@@ -235,6 +235,102 @@ function CheckInModal({ protocol, onClose }: { protocol: Protocol; onClose: () =
   );
 }
 
+// ── Novo Protocolo Modal ──────────────────────────────────────────────────────
+
+const PROTOCOL_TYPES = [
+  { value: 'EMAGRECIMENTO', label: 'Emagrecimento' },
+  { value: 'GANHO_MASSA', label: 'Ganho de Massa' },
+  { value: 'IMPLANTE_HORMONAL', label: 'Implante Hormonal' },
+  { value: 'SOROTERAPIA', label: 'Soroterapia' },
+  { value: 'LONGEVIDADE', label: 'Longevidade' },
+  { value: 'NUTRICIONAL', label: 'Nutricional' },
+  { value: 'PERSONALIZADO', label: 'Personalizado' },
+];
+
+function NovoProtocoloModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [patientId, setPatientId] = useState('');
+  const [name, setName] = useState('');
+  const [type, setType] = useState('EMAGRECIMENTO');
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: patients = [] } = useQuery({
+    queryKey: ['patients-for-protocol'],
+    queryFn: () => api.get('/patients', { params: { limit: 200 } }).then(r => r.data?.data ?? r.data ?? []).catch(() => []),
+  });
+
+  const handleSave = async () => {
+    if (!patientId) { toast.error('Selecione paciente'); return; }
+    if (!name.trim()) { toast.error('Nome do protocolo obrigatório'); return; }
+    setSaving(true);
+    try {
+      await api.post('/clinical/protocols', {
+        patient_id: patientId,
+        type,
+        name,
+        start_date: new Date(startDate).toISOString(),
+        notes: notes || undefined,
+      });
+      toast.success('Protocolo criado');
+      qc.invalidateQueries({ queryKey: ['protocols'] });
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Erro ao criar protocolo');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-bold mb-4">Novo Protocolo</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Paciente *</label>
+            <select value={patientId} onChange={e => setPatientId(e.target.value)} className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary">
+              <option value="">— Selecione —</option>
+              {(patients as any[]).map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Tipo *</label>
+            <select value={type} onChange={e => setType(e.target.value)} className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary">
+              {PROTOCOL_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Nome do Protocolo *</label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Emagrecimento 12 sessões" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Data de início *</label>
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Observações</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm resize-none outline-none focus:border-primary" />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-4">
+          <Button variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Button>
+          <Button className="flex-1" disabled={saving} onClick={handleSave}>
+            {saving ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Salvando...</> : 'Criar Protocolo'}
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function SessionsPage() {
@@ -242,7 +338,19 @@ export default function SessionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [checkIn, setCheckIn] = useState<Protocol | null>(null);
+  const [novoProtocolo, setNovoProtocolo] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const qc = useQueryClient();
+
+  const updateProtocolStatus = async (id: string, status: string, msg: string) => {
+    try {
+      await api.patch(`/clinical/protocols/${id}`, { status });
+      toast.success(msg);
+      qc.invalidateQueries({ queryKey: ['protocols'] });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Erro ao atualizar protocolo');
+    }
+  };
 
   const { data: protocolsData = [], isLoading: loadingProtocols } = useQuery({
     queryKey: ['protocols'],
@@ -361,14 +469,18 @@ export default function SessionsPage() {
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
 
-          <Button size="sm" variant="secondary" onClick={() => toast.info('Abrindo módulo de biometria facial...')}>
+          <Button size="sm" variant="secondary" onClick={() => toast.info('Biometria facial será ativada na próxima versão')}>
             <Scan className="h-3.5 w-3.5 mr-1.5" />Cadastrar Biometria Facial
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => toast.info('Escaneando biometria...')}>
+          <Button size="sm" variant="secondary" onClick={() => toast.info('Biometria facial será ativada na próxima versão')}>
             <Scan className="h-3.5 w-3.5 mr-1.5" />Dar Baixa com Biometria
           </Button>
-          <Button size="sm" className="ml-auto"><Plus className="h-3.5 w-3.5 mr-1.5" />Novo Protocolo</Button>
+          <Button size="sm" className="ml-auto" onClick={() => setNovoProtocolo(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />Novo Protocolo
+          </Button>
         </div>
+
+        {novoProtocolo && <NovoProtocoloModal onClose={() => setNovoProtocolo(false)} />}
 
         {/* Protocol list */}
         {atrasados > 0 && statusFilter === 'all' && (
@@ -448,12 +560,12 @@ export default function SessionsPage() {
                       </Button>
                     )}
                     {p.status === 'PAUSADO' && (
-                      <Button size="sm" variant="secondary" className="text-xs h-8" onClick={() => toast.success('Protocolo reativado')}>
+                      <Button size="sm" variant="secondary" className="text-xs h-8" onClick={() => updateProtocolStatus(p.id, 'ATIVO', 'Protocolo reativado')}>
                         <Play className="h-3.5 w-3.5 mr-1" />Reativar
                       </Button>
                     )}
                     {p.status === 'CONCLUIDO' && (
-                      <Button size="sm" variant="secondary" className="text-xs h-8" onClick={() => toast.success('Novo protocolo criado a partir do anterior')}>
+                      <Button size="sm" variant="secondary" className="text-xs h-8" onClick={() => setNovoProtocolo(true)}>
                         <Repeat2 className="h-3.5 w-3.5 mr-1" />Renovar
                       </Button>
                     )}
@@ -494,7 +606,7 @@ export default function SessionsPage() {
                       <Button variant="secondary" size="sm" className="text-xs">Ver Prontuário</Button>
                       <Button variant="secondary" size="sm" className="text-xs">Histórico de Sessões</Button>
                       {p.status === 'ATIVO' && (
-                        <Button variant="secondary" size="sm" className="text-xs" onClick={() => toast.success('Protocolo pausado')}>
+                        <Button variant="secondary" size="sm" className="text-xs" onClick={() => updateProtocolStatus(p.id, 'PAUSADO', 'Protocolo pausado')}>
                           <Pause className="h-3 w-3 mr-1" />Pausar Protocolo
                         </Button>
                       )}

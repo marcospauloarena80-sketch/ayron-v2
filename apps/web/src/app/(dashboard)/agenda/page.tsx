@@ -634,27 +634,27 @@ export default function AgendaPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      updateAppointmentStatus(id, status),
+      api.patch(`/agenda/${id}`, { status }).then(r => r.data),
     onSuccess: () => { toast.success('Status atualizado'); qc.invalidateQueries({ queryKey: ['agenda'] }); },
-    onError: (e: any) => toast.error((e as any).message ?? 'Erro ao atualizar status'),
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? e.message ?? 'Erro ao atualizar status'),
   });
 
   const checkInMutation = useMutation({
-    mutationFn: (appt: any) => updateAppointmentStatus(appt.id, 'CHECKED_IN').then(r => ({ r, appt })),
+    mutationFn: (appt: any) => api.post(`/agenda/${appt.id}/check-in`).then(r => ({ r: r.data, appt })),
     onSuccess: (r: any) => { toast.success('Check-in realizado'); setActiveTimerAppt(r.appt); qc.invalidateQueries({ queryKey: ['agenda'] }); },
-    onError: (e: any) => toast.error((e as any).message ?? 'Erro no check-in'),
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? e.message ?? 'Erro no check-in'),
   });
 
   const checkOutMutation = useMutation({
-    mutationFn: (id: string) => updateAppointmentStatus(id, 'COMPLETED'),
+    mutationFn: (id: string) => api.post(`/agenda/${id}/finalize`).then(r => r.data),
     onSuccess: () => { toast.success('Atendimento encerrado'); setActiveTimerAppt(null); qc.invalidateQueries({ queryKey: ['agenda'] }); },
-    onError: (e: any) => toast.error((e as any).message ?? 'Erro no check-out'),
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? e.message ?? 'Erro no check-out'),
   });
 
   const closingMutation = useMutation({
-    mutationFn: () => closeDailyAppointments(dateStr),
+    mutationFn: () => api.post(`/agenda/daily-closing/${dateStr}`).then(r => r.data),
     onSuccess: () => { toast.success('Fechamento diário realizado!'); qc.invalidateQueries({ queryKey: ['closing', dateStr] }); qc.invalidateQueries({ queryKey: ['agenda'] }); },
-    onError: (e: any) => toast.error((e as any).message ?? 'Erro no fechamento'),
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? e.message ?? 'Erro no fechamento'),
   });
 
   // Compute unique types from today's appointments

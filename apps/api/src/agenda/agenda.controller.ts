@@ -81,9 +81,14 @@ export class AgendaController {
     return this.service.cancel(u.clinic_id, id, dto.reason, u.sub);
   }
 
-  @Post(':id/daily-closing')
-  performDailyClosing(@CurrentUser() u: RequestUser, @Param('id') id: string) {
-    return this.service.performDailyClosing(u.clinic_id, id, u.sub);
+  @Post('daily-closing/:date')
+  performDailyClosing(@CurrentUser() u: RequestUser, @Param('date') date: string) {
+    return this.service.performDailyClosing(u.clinic_id, date, u.sub);
+  }
+
+  @Post('bulk-confirm')
+  bulkConfirm(@CurrentUser() u: RequestUser, @Body() dto: { ids: string[] }) {
+    return this.service.bulkUpdateStatus(u.clinic_id, dto.ids, 'CONFIRMED', u.sub);
   }
 
   @Post(':id/start')
