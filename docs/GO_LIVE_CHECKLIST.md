@@ -165,6 +165,21 @@ Migrations are forward-only via `prisma migrate deploy`. To rollback:
 | Banco de dados | Marcos | (definir) |
 | Incidentes prod | Marcos | (definir) |
 
+## 10.1 Account map
+
+| Service | Account | Notes |
+|---------|---------|-------|
+| Railway | `capitalvortexx@gmail.com` | Project: `ayron-v2` (Vortex Capital workspace) |
+| Vercel | `capitalvortexx@gmail.com` | Project: `web` (capitalvortexx-6920s-projects) |
+| GitHub | `marcospauloarena80@gmail.com` | Repo: `marcospauloarena80-sketch/ayron-v2` |
+
+> Railway CLI: `railway login` → autorizar com `capitalvortexx@gmail.com`
+> Vercel CLI: já autenticado como `capitalvortexx-6920`
+> GitHub remote: `https://github.com/marcospauloarena80-sketch/ayron-v2.git`
+>
+> ⚠️  Railway NÃO auto-deploya do GitHub (contas diferentes).
+>     Para deploy: `cd apps/api && railway up --detach` ou redeploy manual no dashboard.
+
 ## 11. Pre-flight final
 
 - [ ] `npm run build` (root) succeeds
