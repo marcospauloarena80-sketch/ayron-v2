@@ -16,6 +16,12 @@ export class AuthController {
     return this.authService.login(dto.email, dto.password, req.ip);
   }
 
+  /** One-shot bootstrap: creates demo org/clinic + MASTER user. Idempotent. */
+  @Post('bootstrap')
+  bootstrap(@Body() dto?: { email?: string; password?: string; secret?: string }) {
+    return this.authService.bootstrap(dto);
+  }
+
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @Post('logout')
