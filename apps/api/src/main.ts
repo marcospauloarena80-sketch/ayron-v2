@@ -11,8 +11,18 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
 
+  const rawOrigin = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
+  const allowedOrigins = rawOrigin.split(',').map(o => o.trim());
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+    origin: (origin, cb) => {
+      // Allow requests with no origin (mobile apps, curl, server-to-server)
+      if (!origin) return cb(null, true);
+      // Allow any vercel.app subdomain (preview + production deployments)
+      if (origin.endsWith('.vercel.app')) return cb(null, true);
+      // Allow explicitly listed origins
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true,
   });
 
