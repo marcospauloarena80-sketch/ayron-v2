@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
-import { createClient } from '@/lib/supabase/client';
+import api from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -177,25 +177,10 @@ function LoginForm() {
     setError(null);
 
     try {
-      let supabase;
-      try {
-        supabase = createClient();
-      } catch {
-        setError('Sistema não configurado. Contacte o suporte.');
-        return;
-      }
-      const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-
-      if (sbError) {
-        setError('E-mail ou senha incorretos');
-        return;
-      }
-
-      const sbUser = sbData.user;
-      const meta = sbUser.user_metadata ?? {};
+      const { data: res } = await api.post<{
+        access_token: string;
+        user: { id: string; name: string; email: string; role: string; clinic_id?: string };
+      }>('/auth/login', { email: data.email, password: data.password });
 
       const ROLE_PERMISSIONS: Record<string, string[]> = {
         MASTER: ['*'],
@@ -206,14 +191,14 @@ function LoginForm() {
         RECEPCIONISTA: ['patients.view', 'agenda.*', 'financial.view'],
       };
 
-      const role = (meta.role ?? 'MEDICO') as any;
+      const role = (res.user.role ?? 'MEDICO') as any;
       const mappedUser = {
-        id: sbUser.id,
-        name: meta.name ?? sbUser.email ?? 'Usuário',
-        email: sbUser.email ?? '',
+        id: res.user.id,
+        name: res.user.name ?? res.user.email ?? 'Usuário',
+        email: res.user.email ?? '',
         role,
-        clinic_id: meta.clinic_id ?? 'clinic-1',
-        unit: meta.unit ?? 'Clínica Barra',
+        clinic_id: res.user.clinic_id ?? 'clinic-1',
+        unit: 'Clínica Barra',
         permissions: ROLE_PERMISSIONS[role] ?? ['*'],
         preferences: {
           theme: 'light' as const,
@@ -223,12 +208,21 @@ function LoginForm() {
         },
       };
 
-      const token = sbData.session?.access_token ?? 'supabase-token';
+      const token = res.access_token;
       setAuth(mappedUser, token);
+      // Persist token in localStorage for the api client + cookie for middleware
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ayron_token', token);
+      }
       document.cookie = `ayron_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
       router.push('/dashboard');
-    } catch {
-      setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 400 || status === 403) {
+        setError('E-mail ou senha incorretos');
+      } else {
+        setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+      }
     }
   };
 
