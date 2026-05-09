@@ -16,10 +16,13 @@ export class AuthController {
     return this.authService.login(dto.email, dto.password, req.ip);
   }
 
-  /** One-shot bootstrap: creates demo org/clinic + MASTER user. Idempotent. */
+  /** One-shot bootstrap: creates demo org/clinic + MASTER user. Idempotent + locked once MASTER exists. */
   @Post('bootstrap')
-  bootstrap(@Body() dto?: { email?: string; password?: string; secret?: string }) {
-    return this.authService.bootstrap(dto);
+  bootstrap(
+    @Body() dto: { email?: string; password?: string; secret?: string } | undefined,
+    @Req() req: Request,
+  ) {
+    return this.authService.bootstrap(dto, req.ip);
   }
 
   @ApiBearerAuth()

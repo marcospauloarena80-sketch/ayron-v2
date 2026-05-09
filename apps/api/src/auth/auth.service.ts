@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UserRole } from '@prisma/client';
@@ -19,10 +19,50 @@ export class AuthService {
   ) {}
 
   /** One-shot, idempotent: creates demo org/clinic + MASTER user if absent. */
-  async bootstrap(input?: { email?: string; password?: string; secret?: string }) {
+  async bootstrap(input?: { email?: string; password?: string; secret?: string }, ip?: string) {
+    // Gate 1: explicit disable flag (set after first run)
+    if (process.env.BOOTSTRAP_ENABLED === 'false') {
+      throw new ForbiddenException('Bootstrap is disabled.');
+    }
+
+    // Gate 2: secret required in production
     const expectedSecret = process.env.BOOTSTRAP_SECRET;
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd && !expectedSecret) {
+      throw new ForbiddenException('BOOTSTRAP_SECRET must be set in production.');
+    }
     if (expectedSecret && input?.secret !== expectedSecret) {
+      // Audit failed attempt
+      await this.audit.log({
+        clinic_id: BOOTSTRAP_CLINIC_ID,
+        action: 'LOGIN' as any,
+        entity_type: 'Bootstrap',
+        entity_id: 'bootstrap',
+        ip_address: ip,
+        data_after: { reason: 'invalid_secret' },
+      }).catch(() => undefined);
       throw new UnauthorizedException('Invalid bootstrap secret');
+    }
+
+    // Gate 3: refuse if ANY MASTER user already exists in the system
+    const existingMaster = await this.prisma.user.findFirst({
+      where: { role: UserRole.MASTER, deleted_at: null },
+      select: { id: true, email: true, clinic_id: true },
+    });
+    if (existingMaster) {
+      await this.audit.log({
+        clinic_id: existingMaster.clinic_id,
+        actor_id: existingMaster.id,
+        action: 'LOGIN' as any,
+        entity_type: 'Bootstrap',
+        entity_id: 'bootstrap',
+        ip_address: ip,
+        data_after: { reason: 'already_initialized', master_email: existingMaster.email },
+      }).catch(() => undefined);
+      return {
+        already_initialized: true,
+        message: 'MASTER user already exists. Bootstrap is locked. Reset via DB if needed.',
+      };
     }
 
     const email = (input?.email ?? 'master@ayron.health').toLowerCase().trim();
@@ -38,7 +78,7 @@ export class AuthService {
         already_initialized: true,
         user: existingUser,
         login_url: '/auth/login',
-        message: 'MASTER user already exists. Use the existing credentials or reset via DB.',
+        message: 'User with this email already exists.',
       };
     }
 

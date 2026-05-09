@@ -12,7 +12,8 @@
     "db:migrate": "pnpm --filter api run db:migrate",
     "db:generate": "pnpm --filter api run db:generate",
     "db:seed": "pnpm --filter api run db:seed",
-    "db:studio": "pnpm --filter api run db:studio"
+    "db:studio": "pnpm --filter api run db:studio",
+    "smoke:prod": "node scripts/smoke-prod.mjs"
   },
   "workspaces": [
     "apps/*",

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/layout/providers';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from 'sonner';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${jakarta.variable} font-sans`}>
         <Providers>
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
           <Toaster position="top-right" richColors />
         </Providers>
       </body>

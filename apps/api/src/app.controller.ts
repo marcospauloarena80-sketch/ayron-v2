@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from './common/prisma/prisma.service';
 import { StorageService } from './common/storage/storage.service';
 import { ConfigService } from '@nestjs/config';
@@ -6,6 +6,8 @@ import Redis from 'ioredis';
 
 @Controller()
 export class AppController {
+  private readonly bootedAt = Date.now();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -32,8 +34,22 @@ export class AppController {
       rls: auditTrigger === 'active' ? 'active' : 'inactive',
       audit_trigger: auditTrigger,
       ts: new Date().toISOString(),
-      version: process.env.npm_package_version ?? '1.0.0',
+      version: process.env.npm_package_version ?? process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? '1.0.0',
+      build_sha: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
+      uptime_seconds: Math.floor((Date.now() - this.bootedAt) / 1000),
+      env: process.env.NODE_ENV ?? 'development',
     };
+  }
+
+  /** Kubernetes/Railway readiness probe — fails fast if DB unreachable. */
+  @Get('ready')
+  async ready() {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return { ready: true, ts: new Date().toISOString() };
+    } catch (e: any) {
+      throw new ServiceUnavailableException({ ready: false, reason: e?.message ?? 'db_unreachable' });
+    }
   }
 
   private async checkRedis(): Promise<string> {

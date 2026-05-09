@@ -1,12 +1,16 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 import { FinanceFullService } from './finance-full.service';
 import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 
 @ApiTags('Finance Full')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(UserRole.MASTER, UserRole.GERENTE, UserRole.FINANCEIRO)
 @Controller('finance')
 export class FinanceFullController {
   constructor(private readonly svc: FinanceFullService) {}
