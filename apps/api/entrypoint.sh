@@ -7,5 +7,8 @@ npx prisma migrate resolve --rolled-back 0001_initial 2>/dev/null || true
 echo "[AYRON] Running database migrations..."
 npx prisma migrate deploy
 
+echo "[AYRON] Seeding MASTER user if not exists..."
+node prisma/seed-prod.cjs || echo "[AYRON] Seed step skipped (non-fatal)"
+
 echo "[AYRON] Starting API server..."
 exec node dist/src/main
